@@ -1,0 +1,105 @@
+name: napcatqq-service
+
+services:
+  backend:
+    image: ${BACKEND_IMAGE:-napcatqq-service-backend}:${IMAGE_TAG:-latest}
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: napcatqq-service-backend
+    env_file:
+      - ./.env
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+      HOST: 0.0.0.0
+      PORT: 8000
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./data:/app/data
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import json,urllib.request; data=json.load(urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5)); raise SystemExit(0 if data.get('success') else 1)\""]
+      interval: 20s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - napcatqq-service-network
+
+  mysql:
+    image: mysql:8.0
+    container_name: napcatqq-service-mysql
+    env_file:
+      - ./.env
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-CHANGE_ME}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-napcat}
+      MYSQL_USER: ${MYSQL_USER:-napcat}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-CHANGE_ME}
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_0900_ai_ci"]
+    volumes:
+      - ./data/mysql:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      - napcatqq-service-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: napcatqq-service-redis
+    env_file:
+      - ./.env
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-CHANGE_ME}
+    command: ["sh", "-c", "exec redis-server --requirepass \"$$REDIS_PASSWORD\" --appendonly yes"]
+    volumes:
+      - ./data/redis:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli --no-auth-warning -a \"$$REDIS_PASSWORD\" ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+    networks:
+      - napcatqq-service-network
+
+  frontend:
+    image: ${FRONTEND_IMAGE:-napcatqq-service-frontend}:${IMAGE_TAG:-latest}
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    container_name: napcatqq-service-frontend
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "${FRONTEND_PORT:-5178}:80"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/health | grep -q '\"success\":true'"]
+      interval: 20s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - napcatqq-service-network
+
+networks:
+  napcatqq-service-network:
+    name: napcatqq-service-network

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ClaudeCodeTabState">
+    <option name="tabSessions">
+      <map>
+        <entry key="0">
+          <value>
+            <TabSessionState>
+              <option name="projectPath" value="D:\tmp\NapCatQQ_Service" />
+              <option name="provider" value="codex" />
+              <option name="sessionId" value="01a149a5-219d-76a3-bcd4-83c1af69bcbb" />
+              <option name="cwd" value="D:\tmp\NapCatQQ_Service" />
+              <option name="model" value="gpt-6-astra" />
+              <option name="permissionMode" value="default" />
+            </TabSessionState>
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
+</project>

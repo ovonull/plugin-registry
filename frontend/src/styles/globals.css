@@ -1,0 +1,81 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&display=swap');
+
+:root {
+  --primary: #2563eb;
+  --primary-soft: #dbeafe;
+  --primary-strong: color-mix(in srgb, var(--primary) 86%, #111827);
+  --page-bg: #f4f7fb;
+  --surface: #ffffff;
+  --surface-soft: #f8fafc;
+  --surface-muted: #eef2f7;
+  --text: #1e293b;
+  --text-muted: #64748b;
+  --text-subtle: #94a3b8;
+  --border: #e2e8f0;
+  --border-strong: #cbd5e1;
+  --sidebar: #ffffff;
+  --danger: #dc2626;
+  --danger-soft: #fee2e2;
+  --success: #059669;
+  --success-soft: #d1fae5;
+  --warning: #d97706;
+  --warning-soft: #fef3c7;
+  --info-soft: #e0f2fe;
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, .04);
+  --shadow-lg: 0 18px 50px rgba(15, 23, 42, .16);
+  --font: 'Noto Sans SC', 'Microsoft YaHei', system-ui, sans-serif;
+  color-scheme: light;
+}
+
+:root.dark {
+  --page-bg: #0f172a;
+  --surface: #172033;
+  --surface-soft: #1d293d;
+  --surface-muted: #25334a;
+  --text: #e2e8f0;
+  --text-muted: #94a3b8;
+  --text-subtle: #64748b;
+  --border: #2d3b52;
+  --border-strong: #40516c;
+  --sidebar: #001529;
+  --danger-soft: #451b25;
+  --success-soft: #123c36;
+  --warning-soft: #4a3513;
+  --info-soft: #14364a;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, .18);
+  color-scheme: dark;
+}
+
+:root[data-font='yahei'] { --font: 'Microsoft YaHei', sans-serif; }
+:root[data-font='heiti'] { --font: 'SimHei', sans-serif; }
+:root[data-font='songti'] { --font: 'SimSun', serif; }
+:root[data-font='kaiti'] { --font: 'KaiTi', serif; }
+:root[data-font='fangsong'] { --font: 'FangSong', serif; }
+:root[data-font='xingkai'] { --font: 'STXingkai', 'KaiTi', serif; }
+:root[data-font='rounded'] { --font: 'Arial Rounded MT Bold', 'Microsoft YaHei', sans-serif; }
+:root[data-font='mono'] { --font: 'Cascadia Mono', 'Microsoft YaHei', monospace; }
+
+* { box-sizing: border-box; }
+html, body, #app { min-height: 100%; margin: 0; }
+body { background: var(--page-bg); color: var(--text); font-family: var(--font); font-size: 14px; line-height: 1.55; -webkit-font-smoothing: antialiased; transition: background .2s, color .2s; }
+button, input, textarea, select { font: inherit; }
+button { border: 0; cursor: pointer; color: inherit; }
+button:disabled { cursor: not-allowed; opacity: .55; }
+input, textarea, select { width: 100%; border: 1px solid var(--border-strong); border-radius: 7px; background: var(--surface); color: var(--text); outline: none; transition: border .15s, box-shadow .15s, background .15s; }
+input, select { height: 40px; padding: 0 12px; }
+/* 复选框与单选框不适用上面的大尺寸输入框规则，否则会被拉伸成 40px 高的方块 */
+input[type="checkbox"], input[type="radio"] { width: 16px; height: 16px; padding: 0; vertical-align: middle; flex: none; accent-color: var(--primary); cursor: pointer; }
+textarea { padding: 10px 12px; resize: vertical; min-height: 100px; }
+input::placeholder, textarea::placeholder { color: var(--text-subtle); }
+input:focus, textarea:focus, select:focus { border-color: var(--primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 17%, transparent); }
+a { color: var(--primary); text-decoration: none; }
+h1, h2, h3, p { margin: 0; }
+.spin { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes page-up { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+.page-enter { animation: page-up .2s ease-out both; }
+.fade-enter-active, .fade-leave-active, .modal-enter-active, .modal-leave-active { transition: opacity .18s ease; }
+.fade-enter-from, .fade-leave-to, .modal-enter-from, .modal-leave-to { opacity: 0; }
+.modal-enter-active .modal, .modal-leave-active .modal { transition: transform .18s ease; }
+.modal-enter-from .modal, .modal-leave-to .modal { transform: translateY(8px) scale(.98); }
+
