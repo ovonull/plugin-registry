@@ -67,6 +67,8 @@ import type {
   PluginTrustedAuthor,
   PluginUpgradeResult,
   PluginVersionInfo,
+  RegistryPlugin,
+  RegistryStats,
 } from '../types'
 
 export const authApi = {
@@ -409,6 +411,22 @@ export interface PluginQuery {
   keyword?: string
   source_type?: string
   published?: boolean
+}
+
+/** 公开插件首页查询参数，无需登录。 */
+export interface RegistryPluginQuery {
+  page: number
+  page_size: number
+  keyword?: string
+  sort?: 'latest' | 'popular' | 'name'
+}
+
+export const registryApi = {
+  plugins: (params: RegistryPluginQuery) =>
+    request<Pagination<RegistryPlugin>>({ url: '/registry/plugins', params }),
+  detail: (pluginId: string) =>
+    request<RegistryPlugin | null>({ url: `/registry/plugins/${pluginId}` }),
+  stats: () => request<RegistryStats>({ url: '/registry/stats' }),
 }
 
 export interface PluginInstallationQuery {

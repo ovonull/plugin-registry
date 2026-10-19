@@ -621,6 +621,42 @@ export interface PluginDetail {
   versions: PluginVersionInfo[]
 }
 
+/** 插件库公开首页的插件条目，字段来自 /api/registry/plugins。 */
+export interface RegistryPlugin {
+  plugin_id: string
+  name: string
+  summary: string
+  description: string
+  author: string
+  author_url: string
+  homepage: string
+  license: string
+  source_type: string
+  repo_url: string
+  source_ref: string
+  icon_url: string
+  version: string
+  capabilities: string[]
+  granted_capabilities?: string[]
+  requested_capabilities?: string[]
+  entry?: string
+  install_count: number
+  min_host_version: string
+  max_host_version: string
+  changelog: string
+  published_at: string
+  created_at: string
+  updated_at: string
+}
+
+/** 公开首页顶部统计。 */
+export interface RegistryStats {
+  plugin_count: number
+  install_count: number
+  author_count: number
+  updated_at: string
+}
+
 export interface PluginConfigField {
   key: string
   label: string

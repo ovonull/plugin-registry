@@ -27,7 +27,15 @@ const router = createRouter({
       meta: { title: '注册', public: true },
     },
     {
+      // 公开插件展示首页：不需要登录，独立布局，已登录用户可从右上角进控制台。
       path: '/',
+      name: 'home',
+      component: () => import('../pages/HomePage.vue'),
+      meta: { title: '插件市场', public: true },
+    },
+    {
+      // 后台容器：子路由都是绝对路径，这里的前缀只作为控制台入口使用。
+      path: '/console',
       component: AppLayout,
       redirect: '/dashboard',
       children: appRoutes,
