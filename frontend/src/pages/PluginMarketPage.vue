@@ -325,7 +325,12 @@ async function submitPlugin() {
     return
   }
   submitOpen.value = false
-  toast.show('插件版本已提交，等待管理员审核', 'success')
+  // 管理员提交由后端直接免审上架，提示语要跟着变，避免让人以为还在排队。
+  const approved = response.data?.version?.review_status === 'approved'
+  toast.show(
+    approved ? '插件已发布并上架' : '插件版本已提交，等待管理员审核',
+    'success',
+  )
   query.page = 1
   await loadPlugins()
 }
@@ -555,7 +560,7 @@ onBeforeUnmount(() => {
             </span>
           </div>
         </template>
-        <div class="modal-form-actions"><button type="button" class="button secondary" :disabled="saving" @click="submitOpen = false">取消</button><button class="button primary" type="submit" :disabled="saving || (submitMode === 'zip' && !zipFile)"><span v-if="saving" class="button-spinner" /><CloudUpload :size="16" />提交审核</button></div>
+        <div class="modal-form-actions"><button type="button" class="button secondary" :disabled="saving" @click="submitOpen = false">取消</button><button class="button primary" type="submit" :disabled="saving || (submitMode === 'zip' && !zipFile)"><span v-if="saving" class="button-spinner" /><CloudUpload :size="16" />{{ isAdmin() ? '发布插件' : '提交审核' }}</button></div>
       </form>
     </BaseModal>
 

@@ -60,6 +60,7 @@ SOURCE_TYPE_REPO = "repo"
 SOURCE_TYPE_ZIP = "zip"
 VALID_SOURCE_TYPES = (SOURCE_TYPE_REPO, SOURCE_TYPE_ZIP)
 REVIEW_STATUS_PENDING = "pending"
+REVIEW_STATUS_APPROVED = "approved"
 
 # 审核流水里的上下架状态，与 plugin_review_service 保持同一套取值。
 VISIBILITY_PUBLISHED = "published"
@@ -209,17 +210,28 @@ class PluginService:
         plugin = await self._load_or_create_plugin(
             session, user, manifest, source_type, repo_url
         )
+        # 管理员提交视为自审通过：直接批准清单申请的全部能力并上架，
+        # 普通作者仍然走待审核队列，由管理员核对能力声明。
+        auto_review = is_admin(user)
+        auto_comment = "管理员提交，免审直接上架" if auto_review else ""
         version_row = PluginVersion(
             plugin_id=package.plugin_id,
             version=package.version,
             manifest_json=json.dumps(manifest, ensure_ascii=False, sort_keys=True),
             capabilities_json=json.dumps(manifest["capabilities"], ensure_ascii=False),
-            granted_capabilities_json="[]",
+            granted_capabilities_json=(
+                json.dumps(manifest["capabilities"], ensure_ascii=False)
+                if auto_review
+                else "[]"
+            ),
             entry=str(manifest["entry"]),
             package_path=package.package_path,
             checksum=package.checksum,
             source_ref=reference,
-            review_status=REVIEW_STATUS_PENDING,
+            review_status=REVIEW_STATUS_APPROVED if auto_review else REVIEW_STATUS_PENDING,
+            reviewed_by=user.id if auto_review else None,
+            reviewed_at=beijing_now() if auto_review else None,
+            review_comment=auto_comment,
             min_host_version=str(manifest["min_host_version"]),
             max_host_version=str(manifest["max_host_version"]),
             owner_id=user.id,
@@ -237,18 +249,34 @@ class PluginService:
                 comment="提交插件版本，等待管理员审核",
             )
         )
+        if auto_review:
+            plugin.current_version_id = version_row.id
+            plugin.is_published = True
+            plugin.updated_at = beijing_now()
+            session.add(
+                PluginReview(
+                    plugin_id=package.plugin_id,
+                    version=package.version,
+                    action="approve",
+                    from_status=REVIEW_STATUS_PENDING,
+                    to_status=REVIEW_STATUS_APPROVED,
+                    reviewer_id=user.id,
+                    comment=auto_comment,
+                )
+            )
         await session.commit()
         await session.refresh(plugin)
         await session.refresh(version_row)
         logger.info(
-            "插件版本已提交，插件=%s，版本=%s，提交人=%s，包文件数=%s",
+            "插件版本已%s，插件=%s，版本=%s，提交人=%s，包文件数=%s",
+            "免审上架" if auto_review else "提交",
             package.plugin_id,
             package.version,
             user.username,
             package.file_count,
         )
         return {
-            "plugin": serialize_plugin(plugin, None, user.username),
+            "plugin": serialize_plugin(plugin, version_row, user.username),
             "version": serialize_version(version_row),
         }
 
