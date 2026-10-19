@@ -30,7 +30,8 @@ IMAGE_TAG=latest
 BACKEND_PORT=8000
 FRONTEND_PORT=5178
 
-DATABASE_URL=mysql+aiomysql://napcat:CHANGE_ME@数据库地址:3306/napcat?charset=utf8mb4
+# 默认使用 SQLite，数据库文件随 data 目录持久化，无需额外数据库服务。
+DATABASE_URL=sqlite+aiosqlite:///./data/plugin_registry.db
 DATABASE_CONNECT_TIMEOUT=10
 ADMIN_USERNAME=admin
 ADMIN_PASSWORD=CHANGE_ME_ADMIN_PASSWORD

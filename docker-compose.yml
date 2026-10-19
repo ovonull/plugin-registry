@@ -13,9 +13,10 @@ services:
       TZ: ${TZ:-Asia/Shanghai}
       HOST: 0.0.0.0
       PORT: 8000
+      # 默认使用 SQLite，数据库文件落在挂载的 data 目录里；
+      # 改成 MySQL 时在 .env 覆盖 DATABASE_URL 并启动 mysql profile。
+      DATABASE_URL: ${DATABASE_URL:-sqlite+aiosqlite:///./data/plugin_registry.db}
     depends_on:
-      mysql:
-        condition: service_healthy
       redis:
         condition: service_healthy
     volumes:
@@ -35,6 +36,9 @@ services:
       - napcatqq-service-network
 
   mysql:
+    # 默认不启动：平台默认使用 SQLite。需要 MySQL 时执行
+    # docker compose --profile mysql up -d，并在 .env 里把 DATABASE_URL 换成 MySQL 连接串。
+    profiles: ["mysql"]
     image: mysql:8.0
     container_name: napcatqq-service-mysql
     env_file:

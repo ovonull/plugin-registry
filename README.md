@@ -257,7 +257,9 @@ POST /api/plugin_admin/trusted-authors/{id}/revoke  撤销信任授权（仅管�
 
 ## Docker 部署
 
-Docker 部署使用两个容器：FastAPI 后端和 Nginx 前端。MySQL、Redis 使用外部服务；如果运行在 Docker 宿主机上，地址使用 `host.docker.internal`，Compose 已为 Linux 配置 `host-gateway` 映射。`data` 目录挂载到宿主机，容器和镜像重建不会删除日志或 SQLite 数据。
+Docker 部署使用两个容器：FastAPI 后端和 Nginx 前端。数据库默认使用 **SQLite**，文件落在挂载的 `data` 目录（`data/plugin_registry.db`），不需要额外的数据库容器；Redis 仍为可选的外部服务，如果运行在 Docker 宿主机上，地址使用 `host.docker.internal`，Compose 已为 Linux 配置 `host-gateway` 映射。`data` 目录挂载到宿主机，容器和镜像重建不会删除日志或 SQLite 数据。
+
+如需改用 MySQL，执行 `docker compose --profile mysql up -d` 启动数据库容器，并把 `.env` 里的 `DATABASE_URL` 换成 `mysql+aiomysql://...`。
 
 ### 本机构建部署
 
