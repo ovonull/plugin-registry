@@ -137,6 +137,13 @@ export interface GithubSettings {
   plugin_repo_token: string
 }
 
+/** 仓库插件自动同步设置。 */
+export interface PluginSyncSettings {
+  enabled: boolean
+  interval_seconds: number
+  batch: number
+}
+
 export interface AutoReplyRule {
   id: number
   owner_id: number

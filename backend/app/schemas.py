@@ -182,6 +182,15 @@ class GithubSettingsRequest(BaseModel):
     plugin_repo_token: str = Field(default="", max_length=512)
 
 
+class PluginSyncSettingsRequest(BaseModel):
+    """仓库插件自动同步设置参数。"""
+
+    enabled: bool = True
+    # 最短 5 分钟，避免配置成 0 后把 GitHub 配额瞬间打满。
+    interval_seconds: int = Field(default=21600, ge=300, le=604800)
+    batch: int = Field(default=20, ge=1, le=100)
+
+
 class AutoReplyCreateRequest(BaseModel):
     """自动回复规则新增参数。"""
 

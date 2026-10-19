@@ -37,9 +37,17 @@ GROUP_KEYS: dict[str, dict[str, str]] = {
     "github": {
         "plugin_repo_token": "github.plugin_repo_token",
     },
+    "plugin_sync": {
+        "enabled": "plugin_sync.enabled",
+        "interval_seconds": "plugin_sync.interval_seconds",
+        "batch": "plugin_sync.batch",
+    },
 }
 SENSITIVE_KEYS = {"smtp.password", "github.plugin_repo_token"}
 PUBLIC_GROUPS = ("appearance", "introduction")
+# 读取时需要还原成布尔与整数的字段，其余一律按字符串返回。
+BOOL_FIELDS = {"use_ssl", "enabled"}
+INT_FIELDS = {"port", "interval_seconds", "batch"}
 DEFAULTS = {
     "email": {
         "host": "",
@@ -67,6 +75,11 @@ DEFAULTS = {
         ),
     },
     "github": {"plugin_repo_token": ""},
+    "plugin_sync": {
+        "enabled": "true",
+        "interval_seconds": "21600",
+        "batch": "20",
+    },
 }
 
 
@@ -145,10 +158,10 @@ class SettingService:
             value = decrypt_secret(row.setting_value) if row else DEFAULTS[group].get(field, "")
             if key in SENSITIVE_KEYS and mask_sensitive:
                 value = "******" if value else ""
-            if field == "port":
-                output[field] = int(value or 0)
-            elif field == "use_ssl":
+            if field in BOOL_FIELDS:
                 output[field] = str(value).lower() == "true"
+            elif field in INT_FIELDS:
+                output[field] = int(value or 0)
             else:
                 output[field] = value
         return output

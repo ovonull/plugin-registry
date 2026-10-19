@@ -12,6 +12,7 @@ from app.schemas import (
     EmailSettingsRequest,
     GithubSettingsRequest,
     IntroductionSettingsRequest,
+    PluginSyncSettingsRequest,
 )
 from app.services.setting_service import SettingService
 
@@ -85,8 +86,34 @@ async def save_github(
     await _require_admin(request, session)
     data = await SettingService(session).save_group("github", payload.model_dump())
     token = str(payload.plugin_repo_token or "").strip()
-    object.__setattr__(request.app.state.container.settings, "plugin_repo_token", token)
+    # 前端把掩码原样回传表示「不修改」，此时不能把内存里的令牌清空。
+    if token and token != "******":
+        object.__setattr__(
+            request.app.state.container.settings, "plugin_repo_token", token
+        )
     return success(data, "GitHub 接口设置已保存")
+
+
+@router.put("/plugin-sync/save")
+async def save_plugin_sync(
+    payload: PluginSyncSettingsRequest,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """保存仓库插件自动同步设置，并立即作用于运行时。"""
+    await _require_admin(request, session)
+    data = await SettingService(session).save_group(
+        "plugin_sync", payload.model_dump()
+    )
+    settings = request.app.state.container.settings
+    # Settings 是冻结 dataclass，只能通过 object.__setattr__ 注入运行时配置；
+    # 同步服务每轮都会重新读取这三项，因此保存后无需重启即可生效。
+    object.__setattr__(settings, "plugin_repo_sync_enabled", bool(payload.enabled))
+    object.__setattr__(
+        settings, "plugin_repo_sync_interval", int(payload.interval_seconds)
+    )
+    object.__setattr__(settings, "plugin_repo_sync_batch", int(payload.batch))
+    return success(data, "插件自动同步设置已保存")
 
 
 @router.put("/animated-emoji/save")

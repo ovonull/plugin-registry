@@ -96,20 +96,37 @@ class PluginRepoSyncService:
         self._task = None
 
     async def _loop(self) -> None:
-        """常驻循环：启动延迟 → 同步一轮 → 睡到下一轮。"""
-        interval = max(300, int(self.settings.plugin_repo_sync_interval))
+        """常驻循环：启动延迟 → 同步一轮 → 睡到下一轮。
+
+        间隔与开关每 30 秒重新读一次配置，后台改完不用重启服务。
+        """
         try:
             await asyncio.sleep(STARTUP_DELAY_SECONDS)
             while True:
-                try:
-                    await self.run_once()
-                except asyncio.CancelledError:
-                    raise
-                except Exception as exc:  # noqa: BLE001 - 单轮失败不能让循环退出
-                    logger.warning("插件仓库自动同步失败：%s", exc)
-                await asyncio.sleep(interval)
+                if self.settings.plugin_repo_sync_enabled:
+                    try:
+                        await self.run_once()
+                    except asyncio.CancelledError:
+                        raise
+                    except Exception as exc:  # noqa: BLE001 - 单轮失败不能让循环退出
+                        logger.warning("插件仓库自动同步失败：%s", exc)
+                await self._sleep_between_rounds()
         except asyncio.CancelledError:
             raise
+
+    async def _sleep_between_rounds(self) -> None:
+        """按当前配置等待下一轮，等待期间配置变化能尽快生效。"""
+        step = 30
+        elapsed = 0
+        while True:
+            await asyncio.sleep(step)
+            elapsed += step
+            # 关闭后立即返回，由外层循环每 30 秒检查一次开关，避免一直空转。
+            if not self.settings.plugin_repo_sync_enabled:
+                return
+            target = max(300, int(self.settings.plugin_repo_sync_interval))
+            if elapsed >= target:
+                return
 
     # ------------------------------------------------------------------ 核心逻辑
 

@@ -67,6 +67,7 @@ import type {
   PluginTrustedAuthor,
   PluginUpgradeResult,
   PluginVersionInfo,
+  PluginSyncSettings,
   RegistryPlugin,
   RegistryStats,
 } from '../types'
@@ -162,6 +163,8 @@ export const settingsApi = {
     request<AnimatedEmojiSettings>({ url: '/settings/animated-emoji/save', method: 'PUT', data: payload }),
   saveGithub: (payload: GithubSettings) =>
     request<GithubSettings>({ url: '/settings/github/save', method: 'PUT', data: payload }),
+  savePluginSync: (payload: PluginSyncSettings) =>
+    request<PluginSyncSettings>({ url: '/settings/plugin-sync/save', method: 'PUT', data: payload }),
 }
 
 export interface RuleQuery {

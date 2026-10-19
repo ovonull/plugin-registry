@@ -256,6 +256,24 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     "plugin_repo_token",
                     str(github_settings.get("plugin_repo_token") or "").strip(),
                 )
+            # 仓库插件自动同步的配置只以数据库为准（后台系统设置里维护），
+            # 因此每次启动都把库里保存的值注入运行时，不受 .env 影响。
+            sync_settings = await setting_service.get_group("plugin_sync")
+            object.__setattr__(
+                app_settings,
+                "plugin_repo_sync_enabled",
+                bool(sync_settings.get("enabled", True)),
+            )
+            object.__setattr__(
+                app_settings,
+                "plugin_repo_sync_interval",
+                int(sync_settings.get("interval_seconds") or 21600),
+            )
+            object.__setattr__(
+                app_settings,
+                "plugin_repo_sync_batch",
+                int(sync_settings.get("batch") or 20),
+            )
             await feature_service.initialize_defaults(session)
             await scheduled_task_service.initialize_defaults(session)
             await plugin_service.initialize_defaults(session)

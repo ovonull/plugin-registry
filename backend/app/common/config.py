@@ -115,10 +115,10 @@ class Settings:
     plugin_http_timeout: int = 10
     # 仓库来源插件的自动同步：定时探测作者仓库的最新 tag，
     # 发现新版本自动登记，按审核策略决定是否免审上架。
+    # 这三项只在后台「系统设置 → 插件同步」里维护，不读取环境变量，
+    # 启动时由数据库中的设置覆盖此处默认值。
     plugin_repo_sync_enabled: bool = True
-    # 两轮同步之间的间隔（秒），默认 6 小时，避免打满 GitHub 未认证配额。
     plugin_repo_sync_interval: int = 21600
-    # 单轮最多处理的插件数，防止首次开启时一次拉取过多仓库。
     plugin_repo_sync_batch: int = 20
 
     @classmethod
@@ -162,9 +162,6 @@ class Settings:
             plugin_package_max_size=_read_int("PLUGIN_PACKAGE_MAX_SIZE", 10485760),
             plugin_repo_timeout=_read_int("PLUGIN_REPO_TIMEOUT", 60),
             plugin_repo_token=os.getenv("PLUGIN_REPO_TOKEN", "").strip(),
-            plugin_repo_sync_enabled=_read_bool("PLUGIN_REPO_SYNC_ENABLED", True),
-            plugin_repo_sync_interval=_read_int("PLUGIN_REPO_SYNC_INTERVAL", 21600),
-            plugin_repo_sync_batch=_read_int("PLUGIN_REPO_SYNC_BATCH", 20),
             plugin_runtime=os.getenv("PLUGIN_RUNTIME", "subprocess").strip().lower()
             or "subprocess",
             plugin_event_timeout=_read_int("PLUGIN_EVENT_TIMEOUT", 10),
