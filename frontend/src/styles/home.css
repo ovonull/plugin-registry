@@ -137,12 +137,57 @@
 
 /* ---------- Hero ---------- */
 
+/* Hero 的配色全部走局部变量：浅色主题用淡蓝渐变，
+   深色主题才切换成深底浅字，避免浅色页面中间凹下去一块黑。 */
 .home-hero {
+  --hero-bg: radial-gradient(120% 150% at 50% -25%, #dbeafe 0%, #eef4ff 42%, #f8fafc 78%);
+  --hero-glow: rgba(96, 165, 250, .2);
+  --hero-title: var(--text);
+  --hero-accent: linear-gradient(100deg, #2563eb, #0ea5e9 55%, #7c3aed);
+  --hero-desc: var(--text-muted);
+  --hero-badge-bg: rgba(37, 99, 235, .1);
+  --hero-badge-border: rgba(37, 99, 235, .26);
+  --hero-badge-text: var(--primary-strong);
+  --hero-search-bg: var(--surface);
+  --hero-search-border: var(--border-strong);
+  --hero-search-icon: var(--text-subtle);
+  --hero-search-text: var(--text);
+  --hero-placeholder: var(--text-subtle);
+  --hero-kbd-border: var(--border);
+  --hero-kbd-text: var(--text-subtle);
+  --hero-kbd-bg: var(--surface-soft);
+  --hero-stat: var(--text);
+  --hero-stat-label: var(--text-subtle);
+  --hero-divider: var(--border);
   position: relative;
   overflow: hidden;
   padding: 66px 22px 58px;
-  background: radial-gradient(120% 140% at 50% -20%, #1e3a8a 0%, #0b1220 55%, #070b14 100%);
-  color: #e2e8f0;
+  border-bottom: 1px solid var(--border);
+  background-image: var(--hero-bg);
+  color: var(--text);
+}
+
+:root.dark .home-hero {
+  --hero-bg: radial-gradient(120% 140% at 50% -20%, #1e3a8a 0%, #0b1220 55%, #070b14 100%);
+  --hero-glow: rgba(56, 189, 248, .28);
+  --hero-title: #f8fafc;
+  --hero-accent: linear-gradient(100deg, #60a5fa, #38bdf8 55%, #a78bfa);
+  --hero-desc: #94a3b8;
+  --hero-badge-bg: rgba(37, 99, 235, .14);
+  --hero-badge-border: rgba(147, 197, 253, .32);
+  --hero-badge-text: #bfdbfe;
+  --hero-search-bg: rgba(255, 255, 255, .07);
+  --hero-search-border: rgba(148, 163, 184, .26);
+  --hero-search-icon: #94a3b8;
+  --hero-search-text: #f1f5f9;
+  --hero-placeholder: #7c8ca3;
+  --hero-kbd-border: rgba(148, 163, 184, .3);
+  --hero-kbd-text: #94a3b8;
+  --hero-kbd-bg: transparent;
+  --hero-stat: #f8fafc;
+  --hero-stat-label: #7f8fa6;
+  --hero-divider: rgba(148, 163, 184, .22);
+  border-bottom-color: transparent;
 }
 
 .home-hero-glow {
@@ -152,7 +197,7 @@
   width: 780px;
   height: 480px;
   transform: translateX(-50%);
-  background: radial-gradient(circle, rgba(56, 189, 248, .28), transparent 62%);
+  background: radial-gradient(circle, var(--hero-glow), transparent 62%);
   pointer-events: none;
 }
 
@@ -168,24 +213,24 @@
   align-items: center;
   gap: 6px;
   padding: 5px 11px;
-  border: 1px solid rgba(147, 197, 253, .32);
+  border: 1px solid var(--hero-badge-border);
   border-radius: 99px;
-  background: rgba(37, 99, 235, .14);
-  color: #bfdbfe;
+  background: var(--hero-badge-bg);
+  color: var(--hero-badge-text);
   font-size: 11px;
   font-weight: 600;
 }
 
 .home-hero h1 {
   margin: 18px 0 14px;
-  color: #f8fafc;
+  color: var(--hero-title);
   font-size: clamp(30px, 4.6vw, 50px);
   line-height: 1.12;
   letter-spacing: -.03em;
 }
 
 .home-hero h1 span {
-  background: linear-gradient(100deg, #60a5fa, #38bdf8 55%, #a78bfa);
+  background-image: var(--hero-accent);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -194,7 +239,7 @@
 .home-hero p {
   max-width: 620px;
   margin: 0 auto;
-  color: #94a3b8;
+  color: var(--hero-desc);
   font-size: 14px;
   line-height: 1.75;
 }
@@ -207,14 +252,21 @@
   height: 52px;
   margin: 30px auto 0;
   padding: 0 16px;
-  border: 1px solid rgba(148, 163, 184, .26);
+  border: 1px solid var(--hero-search-border);
   border-radius: 13px;
-  background: rgba(255, 255, 255, .07);
-  color: #94a3b8;
+  background: var(--hero-search-bg);
+  color: var(--hero-search-icon);
+  box-shadow: var(--shadow-sm);
   transition: border-color .15s, background .15s, box-shadow .15s;
 }
 
 .home-search:focus-within {
+  border-color: var(--primary);
+  background: var(--hero-search-bg);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 14%, transparent);
+}
+
+:root.dark .home-search:focus-within {
   border-color: rgba(96, 165, 250, .7);
   background: rgba(255, 255, 255, .1);
   box-shadow: 0 0 0 4px rgba(59, 130, 246, .16);
@@ -226,21 +278,22 @@
   height: 100%;
   border: 0;
   background: transparent;
-  color: #f1f5f9;
+  color: var(--hero-search-text);
   font: inherit;
   font-size: 14px;
   outline: none;
 }
 
 .home-search input::placeholder {
-  color: #7c8ca3;
+  color: var(--hero-placeholder);
 }
 
 .home-search kbd {
   padding: 3px 7px;
-  border: 1px solid rgba(148, 163, 184, .3);
+  border: 1px solid var(--hero-kbd-border);
   border-radius: 5px;
-  color: #94a3b8;
+  background: var(--hero-kbd-bg);
+  color: var(--hero-kbd-text);
   font: 10px/1.4 'Cascadia Mono', Consolas, monospace;
 }
 
@@ -258,20 +311,20 @@
 }
 
 .home-stats strong {
-  color: #f8fafc;
+  color: var(--hero-stat);
   font-size: 22px;
   line-height: 1.2;
 }
 
 .home-stats span {
-  color: #7f8fa6;
+  color: var(--hero-stat-label);
   font-size: 11px;
 }
 
 .home-stats i {
   width: 1px;
   height: 26px;
-  background: rgba(148, 163, 184, .22);
+  background: var(--hero-divider);
 }
 
 /* ---------- 列表区 ---------- */
