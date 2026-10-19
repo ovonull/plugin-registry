@@ -307,7 +307,7 @@ onMounted(() => {
             <h2>插件如何进入这里</h2>
             <p>
               平台只收录审核过的扩展。作者提交一次之后，仓库打新 tag 就会自动收录新版本，
-              不用反复上传。每个插件都公开版本号和权限范围，装之前就知道它会动什么。
+              不用反复上传。
             </p>
           </div>
           <button type="button" class="home-cta ghost" @click="enterConsole">
