@@ -302,13 +302,41 @@ onMounted(() => {
       </div>
 
       <section id="about" class="home-about">
-        <div>
-          <h2>插件如何进入这里</h2>
-          <p>作者提交仓库或压缩包，平台审核能力声明后上架。所有插件都能看到版本号与权限范围，安装前不必猜。</p>
+        <div class="home-about-head">
+          <div>
+            <h2>插件如何进入这里</h2>
+            <p>
+              平台只收录审核过的扩展。作者提交一次之后，仓库打新 tag 就会自动收录新版本，
+              不用反复上传。每个插件都公开版本号和权限范围，装之前就知道它会动什么。
+            </p>
+          </div>
+          <button type="button" class="home-cta ghost" @click="enterConsole">
+            提交插件<ArrowRight :size="16" />
+          </button>
         </div>
-        <button type="button" class="home-cta ghost" @click="enterConsole">
-          提交插件<ArrowRight :size="16" />
-        </button>
+        <ol class="home-steps">
+          <li>
+            <span class="home-step-index">1</span>
+            <div>
+              <strong>提交来源</strong>
+              <p>提交 GitHub 仓库的 tag，或直接上传压缩包；清单里写清版本号与申请的能力。</p>
+            </div>
+          </li>
+          <li>
+            <span class="home-step-index">2</span>
+            <div>
+              <strong>审核上架</strong>
+              <p>首次提交由管理员核对能力声明后上架，高风险权限需要逐项确认。</p>
+            </div>
+          </li>
+          <li>
+            <span class="home-step-index">3</span>
+            <div>
+              <strong>自动更新</strong>
+              <p>之后每次发版自动同步入库，市场里直接显示新版本，安装方按需升级。</p>
+            </div>
+          </li>
+        </ol>
       </section>
     </main>
 
