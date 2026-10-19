@@ -99,6 +99,8 @@
   color: var(--text);
 }
 
+/* 主按钮在浅色页面用低饱和的浅蓝底，悬停才变实心；
+   顶部导航贴着浅色 Hero，实心高饱和蓝会显得突兀。 */
 .home-cta {
   display: inline-flex;
   align-items: center;
@@ -106,20 +108,35 @@
   gap: 7px;
   height: 38px;
   padding: 0 16px;
+  border: 1px solid color-mix(in srgb, var(--primary) 24%, transparent);
   border-radius: 9px;
-  background: #2563eb;
-  color: #fff;
+  background: color-mix(in srgb, var(--primary) 10%, var(--surface));
+  color: var(--primary-strong);
   font-size: 13px;
   font-weight: 600;
   white-space: nowrap;
-  box-shadow: 0 6px 16px rgba(37, 99, 235, .24);
-  transition: transform .15s, box-shadow .15s, background .15s;
+  transition: transform .15s, box-shadow .15s, background .15s, border-color .15s, color .15s;
 }
 
 .home-cta:hover {
-  background: #1d4ed8;
-  box-shadow: 0 8px 22px rgba(37, 99, 235, .3);
+  border-color: var(--primary);
+  background: var(--primary);
+  color: #fff;
+  box-shadow: 0 8px 20px -10px color-mix(in srgb, var(--primary) 70%, transparent);
   transform: translateY(-1px);
+}
+
+/* 深色底上浅色按钮反而更靠谱，这里换回实心蓝。 */
+:root.dark .home-cta:not(.ghost) {
+  border-color: transparent;
+  background: #2563eb;
+  color: #fff;
+  box-shadow: 0 6px 16px rgba(37, 99, 235, .24);
+}
+
+:root.dark .home-cta:not(.ghost):hover {
+  background: #1d4ed8;
+  box-shadow: 0 8px 22px rgba(37, 99, 235, .32);
 }
 
 .home-cta.ghost {
