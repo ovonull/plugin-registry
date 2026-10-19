@@ -61,9 +61,28 @@ class RegistryExportService:
             return ""
         return value.astimezone(timezone.utc).isoformat()
 
+    def _author_fields(
+        self, manifest: dict[str, Any], plugin: Plugin
+    ) -> tuple[str, str]:
+        """
+        从清单里取出作者名称与主页。
+
+        清单规范里 author 是 ``{name, url}`` 对象，旧清单可能直接写字符串，
+        两种情况都要兼容；直接 str(dict) 会把原始 Python 字面量吐到页面上。
+        """
+        raw = manifest.get("author")
+        if isinstance(raw, dict):
+            name = str(raw.get("name") or "").strip()
+            url = str(raw.get("url") or "").strip()
+            return name or plugin.author_name or "", url or plugin.author_url or ""
+        if isinstance(raw, str) and raw.strip():
+            return raw.strip(), plugin.author_url or ""
+        return plugin.author_name or "", plugin.author_url or ""
+
     def _version_payload(self, plugin: Plugin, version: PluginVersion) -> dict[str, Any]:
         """把插件与当前版本转换为索引条目。"""
         manifest = self._parse_manifest(version.manifest_json)
+        author_name, _ = self._author_fields(manifest, plugin)
         # 插件版本表没有独立的发布时间字段，审核通过时间即对外可见时间，
         # 尚未记录审核时间的版本退回创建时间，保证排序不会出现空值抖动。
         published_at = self._iso(version.reviewed_at or version.created_at)
@@ -73,7 +92,7 @@ class RegistryExportService:
             "version": version.version,
             "summary": str(manifest.get("description") or plugin.summary or ""),
             "description": str(manifest.get("description_long") or plugin.description or ""),
-            "author": str(manifest.get("author") or plugin.author_name or ""),
+            "author": author_name,
             "homepage": str(manifest.get("homepage") or plugin.homepage or ""),
             "source_type": plugin.source_type,
             "repo_url": plugin.repo_url or "",
@@ -95,13 +114,16 @@ class RegistryExportService:
     ) -> dict[str, Any]:
         """构造展示首页用的插件条目，字段与索引条目保持同源。"""
         base = self._version_payload(plugin, version)
+        _, author_url = self._author_fields(
+            self._parse_manifest(version.manifest_json), plugin
+        )
         # 卡片上只放首段短简介，完整说明留在 description 里给详情弹窗，
         # 否则清单里的一段长文本会把卡片撑得高低不齐。
         base["summary"] = (plugin.summary or "").strip() or base["summary"]
         base.update(
             {
                 "icon_url": plugin.icon_path or "",
-                "author_url": plugin.author_url or "",
+                "author_url": author_url,
                 "license": plugin.license or "",
                 # 公开页面只暴露已批准的能力，未批准的能力不对外展示。
                 "capabilities": self._parse_list(

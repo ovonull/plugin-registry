@@ -485,6 +485,12 @@
   white-space: nowrap;
 }
 
+/* 安装次数是固定长度的短标签，不允许被长作者名挤到第二行。 */
+.home-card-installs {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
 /* ---------- 骨架屏与分页 ---------- */
 
 .home-skeleton-grid {
