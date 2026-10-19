@@ -30,7 +30,7 @@ def append_review_log(
     action: str,
     from_status: str,
     to_status: str,
-    reviewer_id: int,
+    reviewer_id: int | None,
     comment: str,
 ) -> None:
     """
@@ -43,7 +43,7 @@ def append_review_log(
         action: 动作，取值 submit / approve / reject / publish / unpublish。
         from_status: 变更前状态。
         to_status: 变更后状态。
-        reviewer_id: 操作人用户 ID。
+        reviewer_id: 操作人用户 ID；自动同步等系统动作传 None。
         comment: 备注。
     """
     session.add(

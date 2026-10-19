@@ -20,6 +20,8 @@
 .icon-button.button-busy svg { animation: spin .7s linear infinite; }
 .icon-button:disabled { opacity: .55; cursor: not-allowed; }
 .icon-button:disabled:hover { background: transparent; color: var(--text-muted); }
+/* 同步仓库等耗时按钮上的图标旋转，表示正在执行。 */
+.spinning { animation: spin .8s linear infinite; }
 .button-spinner { width: 14px; height: 14px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin .7s linear infinite; }
 .loading-overlay { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; gap: 10px; background: color-mix(in srgb, var(--page-bg) 73%, transparent); color: var(--text-muted); backdrop-filter: blur(2px); }
 .loading-overlay.contained { position: absolute; inset: 0; min-height: 150px; }

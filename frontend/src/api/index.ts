@@ -547,4 +547,22 @@ export const pluginAdminApi = {
     }),
   revokeTrust: (id: number) =>
     request({ url: `/plugin_admin/trusted-authors/${id}/revoke`, method: 'POST' }),
+  // 仓库来源插件自动同步：定时任务之外的手动触发入口。
+  syncRepos: () =>
+    request<{
+      scanned: number
+      submitted: number
+      auto_published: number
+      up_to_date: number
+      failed: string[]
+      checked_at: string
+    }>({ url: '/plugin_admin/sync-repos', method: 'POST' }),
+  syncStatus: () =>
+    request<{
+      enabled: boolean
+      interval_seconds: number
+      batch: number
+      last_run_at: string
+      result: Record<string, unknown>
+    }>({ url: '/plugin_admin/sync-status' }),
 }

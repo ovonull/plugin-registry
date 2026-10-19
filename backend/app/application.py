@@ -62,6 +62,7 @@ from app.services.onebot_service import OneBotService
 from app.services.plugin_hooks import PluginHooks
 from app.services.plugin_install_service import PluginInstallService
 from app.services.plugin_review_service import PluginReviewService
+from app.services.plugin_repo_sync_service import PluginRepoSyncService
 from app.services.plugin_runtime import build_plugin_runtime
 from app.services.plugin_service import PluginService
 from app.services.plugin_trust_service import PluginTrustService
@@ -105,6 +106,7 @@ class ServiceContainer:
     plugin_review_service: PluginReviewService
     plugin_trust_service: PluginTrustService
     plugin_hooks: PluginHooks
+    plugin_repo_sync_service: PluginRepoSyncService
 
 
 def _validation_message(error: RequestValidationError) -> str:
@@ -204,6 +206,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         plugin_install_service = PluginInstallService(app_settings)
         plugin_review_service = PluginReviewService(app_settings)
         plugin_trust_service = PluginTrustService(app_settings)
+        # 仓库来源插件的自动同步：定时探测作者仓库的新 tag 并登记版本。
+        plugin_repo_sync_service = PluginRepoSyncService(
+            app_settings, database, plugin_service
+        )
         app.state.container = ServiceContainer(
             app_settings,
             database,
@@ -232,6 +238,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             plugin_review_service,
             plugin_trust_service,
             plugin_hooks,
+            plugin_repo_sync_service,
         )
         await database.initialize()
         async with database.session_factory() as session:
@@ -254,9 +261,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             await plugin_service.initialize_defaults(session)
         await ai_proactive_reply_service.start()
         await scheduled_task_service.start()
+        await plugin_repo_sync_service.start()
         try:
             yield
         finally:
+            await plugin_repo_sync_service.close()
             await ai_proactive_reply_service.close()
             await scheduled_task_service.close()
             await plugin_hooks.close()

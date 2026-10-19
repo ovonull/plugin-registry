@@ -143,6 +143,48 @@ async def unpublish_plugin(
     return success(data, "插件已下架")
 
 
+@router.post("/sync-repos")
+async def sync_repos(
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """立即执行一轮仓库来源插件的自动同步。
+
+    定时任务默认 6 小时一轮，这里给管理员一个手动入口：
+    作者刚推完 tag 就能马上把新版本拉进库，不用等下一轮。
+    """
+    _ensure_plugin_enabled(request)
+    await _ensure_admin(request, session)
+    service = request.app.state.container.plugin_repo_sync_service
+    data = await service.run_once()
+    if data.get("skipped"):
+        return success(data, "上一轮同步尚未结束，请稍后再试")
+    total = int(data.get("submitted") or 0)
+    if total:
+        return success(data, f"同步完成，登记 {total} 个新版本")
+    return success(data, "同步完成，没有发现新版本")
+
+
+@router.get("/sync-status")
+async def sync_status(
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """返回自动同步的运行配置与最近一轮结果。"""
+    _ensure_plugin_enabled(request)
+    await _ensure_admin(request, session)
+    container = request.app.state.container
+    settings = container.settings
+    service = container.plugin_repo_sync_service
+    data = {
+        "enabled": bool(settings.plugin_repo_sync_enabled),
+        "interval_seconds": int(settings.plugin_repo_sync_interval),
+        "batch": int(settings.plugin_repo_sync_batch),
+        **service.last_result(),
+    }
+    return success(data)
+
+
 @router.get("/review-logs")
 async def list_review_logs(
     request: Request,

@@ -2,7 +2,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import {
-  BadgeCheck, Ban, Check, FileClock, Filter, ListChecks, RefreshCw, Search, ShieldCheck, UserPlus, X,
+  BadgeCheck, Ban, Check, CloudDownload, FileClock, Filter, ListChecks, RefreshCw, Search, ShieldCheck, UserPlus, X,
 } from 'lucide-vue-next'
 import { pluginAdminApi, pluginApi, publicApi, userApi } from '../api'
 import type {
@@ -35,6 +35,7 @@ const riskNames = ref<DictionaryOption[]>([])
 const catalog = ref<Record<string, PluginCapabilityItem>>({})
 const catalogReady = ref(false)
 const users = ref<ManagedUser[]>([])
+const syncing = ref(false)
 
 const versionQuery = reactive({ plugin_id: '', review_status: '', keyword: '', page: 1, page_size: 20 })
 const versionResult = ref<Pagination<PluginReviewVersion>>({ items: [], page: 1, page_size: 20, total: 0, pages: 1 })
@@ -110,6 +111,27 @@ async function loadCatalog() {
 }
 
 let listRequestId = 0
+
+/** 立刻跑一轮仓库自动同步：作者刚推 tag 时不用等定时任务。 */
+async function syncRepos() {
+  if (syncing.value) return
+  syncing.value = true
+  const response = await pluginAdminApi.syncRepos()
+  syncing.value = false
+  if (!response.success) return toast.show(response.message, 'error')
+  const result = response.data
+  const failed = result?.failed || []
+  if (failed.length) {
+    toast.show(
+      `同步完成：登记 ${result.submitted} 个版本，${failed.length} 个仓库失败（${failed[0]}）`,
+      'warning',
+    )
+  } else {
+    toast.show(response.message, 'success')
+  }
+  versionQuery.page = 1
+  await loadVersions()
+}
 
 async function loadVersions() {
   const current = ++listRequestId
@@ -328,7 +350,12 @@ onMounted(async () => {
   <div class="page-enter plugin-review-page">
     <div class="page-heading">
       <div><p class="eyebrow">PLUGIN REVIEW</p><h1>插件审核台</h1><p>审核只针对能力清单：批准插件能做什么，不逐行审查代码。高风险能力必须逐项勾选。</p></div>
-      <button type="button" class="button ghost" @click="activeTab === 'versions' ? loadVersions() : activeTab === 'logs' ? loadLogs() : loadTrust()"><RefreshCw :size="16" />刷新当前列表</button>
+      <div class="page-heading-actions">
+        <button type="button" class="button secondary" :disabled="syncing" @click="syncRepos">
+          <RefreshCw :size="16" :class="{ spinning: syncing }" />{{ syncing ? '同步中…' : '同步仓库最新版' }}
+        </button>
+        <button type="button" class="button ghost" @click="activeTab === 'versions' ? loadVersions() : activeTab === 'logs' ? loadLogs() : loadTrust()"><RefreshCw :size="16" />刷新当前列表</button>
+      </div>
     </div>
 
     <div class="inner-tabs" role="tablist">
