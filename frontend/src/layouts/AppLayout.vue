@@ -9,6 +9,7 @@ import {
   ChevronLeft,
   ContactRound,
   History,
+  Home,
   LayoutDashboard,
   ListChecks,
   LogOut,
@@ -56,6 +57,7 @@ const userMenuOpen = ref(false)
 const themeOpen = ref(false)
 
 const iconMap = {
+  home: Home,
   history: History,
   mail: Mail,
   dashboard: LayoutDashboard,
@@ -80,9 +82,30 @@ const iconMap = {
   plug: Plug,
   'shield-check': ShieldCheck,
 }
-const menus = computed(() => appRoutes.filter((item) => (
-  item.meta?.menu && (!item.meta.admin || auth.state.user?.role_code === 'admin')
-)))
+interface MenuItem {
+  path: string
+  name: string
+  meta: { title: string; icon: string }
+}
+
+// 「首页」指向公开插件展示页（独立布局），所以不进 appRoutes，
+// 在这里固定放在菜单第一位，避免和后台页面的路由混在一起。
+const homeMenuItem: MenuItem = {
+  path: '/',
+  name: 'home',
+  meta: { title: '首页', icon: 'home' },
+}
+
+const menus = computed<MenuItem[]>(() => [
+  homeMenuItem,
+  ...appRoutes
+    .filter((item) => item.meta?.menu && (!item.meta.admin || auth.state.user?.role_code === 'admin'))
+    .map((item) => ({
+      path: item.path,
+      name: String(item.name),
+      meta: { title: String(item.meta?.title || ''), icon: String(item.meta?.icon || '') },
+    })),
+])
 const pageTitle = computed(() => String(route.meta.title || '管理后台'))
 
 async function logout() {
