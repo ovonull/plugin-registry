@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { Mail, Palette, Save, TextCursorInput, Github, RefreshCcw, KeyRound } from 'lucide-vue-next'
-import { settingsApi } from '../api'
+import { pluginAdminApi, settingsApi } from '../api'
 import LoadingOverlay from '../components/common/LoadingOverlay.vue'
 import PasswordInput from '../components/common/PasswordInput.vue'
 import { useSystemSettings } from '../composables/useSystemSettings'
@@ -33,14 +33,41 @@ const github = reactive<GithubSettings>({ plugin_repo_token: '' })
 const pluginSync = reactive<PluginSyncSettings>({ enabled: true, interval_seconds: 21600, batch: 20 })
 const registry = reactive<RegistrySettings>({ token: '' })
 
-// 界面上用小时更直观，落库仍存秒，避免后端再做单位换算。
-const intervalHours = computed({
-  get: () => Math.max(1, Math.round(pluginSync.interval_seconds / 3600)),
+// 界面上按分钟编辑更直观：后端硬下限是 300 秒，落库仍存秒。
+const intervalMinutes = computed({
+  get: () => Math.max(5, Math.round(pluginSync.interval_seconds / 60)),
   set: (value: number) => {
-    const hours = Math.min(168, Math.max(1, Math.round(Number(value) || 1)))
-    pluginSync.interval_seconds = hours * 3600
+    const minutes = Math.min(10080, Math.max(5, Math.round(Number(value) || 5)))
+    pluginSync.interval_seconds = minutes * 60
   },
 })
+
+// 手动触发一轮同步：改完间隔想立刻验证有没有新 tag 时用。
+const syncing = ref(false)
+const lastSyncAt = ref('')
+
+function formatSyncTime(value: string): string {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toLocaleString('zh-CN', { hour12: false })
+}
+
+async function loadSyncStatus() {
+  const response = await pluginAdminApi.syncStatus()
+  if (response.success && response.data) {
+    lastSyncAt.value = formatSyncTime(response.data.last_run_at)
+  }
+}
+
+async function triggerSync() {
+  syncing.value = true
+  const response = await pluginAdminApi.syncRepos()
+  syncing.value = false
+  if (!response.success) return toast.show(response.message, 'error')
+  toast.show(response.message, 'success')
+  loadSyncStatus()
+}
 const tabs = [
   { value: 'email' as const, label: '发件人设置', icon: Mail },
   { value: 'appearance' as const, label: '主题与字体', icon: Palette },
@@ -63,7 +90,10 @@ async function loadGroup(group: Tab) {
   if (group === 'appearance') Object.assign(appearance, result.data)
   if (group === 'introduction') Object.assign(introduction, result.data)
   if (group === 'github') Object.assign(github, result.data)
-  if (group === 'plugin_sync') Object.assign(pluginSync, result.data)
+  if (group === 'plugin_sync') {
+    Object.assign(pluginSync, result.data)
+    loadSyncStatus()
+  }
   if (group === 'registry') Object.assign(registry, result.data)
   loaded[group] = true
 }
@@ -173,9 +203,16 @@ onMounted(() => loadGroup('email'))
       <form class="settings-form" @submit.prevent="savePluginSync">
         <label class="toggle-field"><span><strong>启用自动同步</strong><small>关闭后仍可在插件审核台手动点「同步仓库最新版」</small></span><button class="switch" :class="{ active: pluginSync.enabled }" type="button" role="switch" :aria-checked="pluginSync.enabled" @click="pluginSync.enabled = !pluginSync.enabled"><i /></button></label>
         <div class="form-grid">
-          <label>同步间隔<input v-model.number="intervalHours" type="number" min="1" max="168" step="1" /><small>单位小时，最短 1 小时，默认 6 小时</small></label>
-          <label>单轮上限<input v-model.number="pluginSync.batch" type="number" min="1" max="100" /><small>每轮最多检查多少个仓库，超出会轮转</small></label>
+          <label>同步间隔<input v-model.number="intervalMinutes" type="number" min="5" max="10080" step="5" /><small>单位分钟，最短 5 分钟，默认 360 分钟（6 小时），保存后 30 秒内生效</small></label>
+          <label>单轮上限<input v-model.number="pluginSync.batch" type="number" min="1" max="100" /><small>每轮最多检查多少个仓库，超出会按轮转依次覆盖</small></label>
         </div>
+        <div class="form-actions-inline">
+          <button type="button" class="button secondary" :disabled="syncing" @click="triggerSync">
+            <span v-if="syncing" class="button-spinner" /><RefreshCcw :size="15" />立即同步一次
+          </button>
+          <span class="muted-text">{{ lastSyncAt ? `上次同步：${lastSyncAt}` : '尚未执行过同步' }}</span>
+        </div>
+        <p class="form-hint">轮询间隔只影响「多久检查一轮」；单轮上限小于插件总数时，每个仓库实际是「间隔 × 轮数」才轮到一次。想立刻拉取刚推的 tag，用上面的「立即同步一次」。</p>
         <p class="form-hint">审核规则：插件首次入库需人工审核；已有审核通过的版本后，新版本自动免审上架；信任名单作者与管理员免审直接上架；被管理员下架过的插件只免审通过，不会自动重新上架。</p>
         <div class="form-actions"><button class="button primary" type="submit" :disabled="saving"><span v-if="saving" class="button-spinner" /><Save :size="16" />保存同步设置</button></div>
       </form>
