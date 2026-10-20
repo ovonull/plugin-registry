@@ -5,8 +5,8 @@ import { useTheme } from './useTheme'
 const state = reactive({
   loaded: false,
   introduction: {
-    name: 'NapCatQQ 插件库',
-    description: 'NapCatQQ 插件分发与审核平台',
+    name: 'PlugHub 插件库',
+    description: 'PlugHub 插件分发与审核平台',
   },
   appearance: { color: 'ocean', font: 'system', effect: 'solid' },
 })

@@ -167,6 +167,15 @@
 /* 插件列表首列同时显示名称与简介，简介过长时单行省略，避免把整列撑宽。 */
 .plugin-market-table td:first-child small, .plugin-review-table td:first-child small { display: block; max-width: 230px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+/* 我的插件：提交记录列表与版本弹窗 */
+.my-plugin-table table { min-width: 1040px; }
+.status-badge.pending { color: var(--warning); background: var(--warning-soft); }
+.status-badge.approved { color: var(--success); background: var(--success-soft); }
+.status-badge.rejected { color: var(--danger); background: var(--danger-soft); }
+.my-plugin-detail { display: grid; gap: 14px; }
+.my-plugin-detail code { font-size: 11px; font-weight: 500; }
+.my-plugin-detail-loading { padding: 30px 0; color: var(--text-subtle); font-size: 12px; text-align: center; }
+
 /* 插件库首页：已上架插件展示 */
 .registry-featured { overflow: hidden; }
 .registry-plugin-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; padding: 14px 17px 17px; }

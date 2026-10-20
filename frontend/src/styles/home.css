@@ -99,8 +99,8 @@
   color: var(--text);
 }
 
-/* 主按钮在浅色页面用低饱和的浅蓝底，悬停才变实心；
-   顶部导航贴着浅色 Hero，实心高饱和蓝会显得突兀。 */
+/* 主按钮底色跟后台顶栏保持一致（近白），只在悬停时才变实心蓝，
+   避免在浅色 Hero 旁边出现一块高饱和色块。 */
 .home-cta {
   display: inline-flex;
   align-items: center;
@@ -108,9 +108,9 @@
   gap: 7px;
   height: 38px;
   padding: 0 16px;
-  border: 1px solid color-mix(in srgb, var(--primary) 24%, transparent);
+  border: 1px solid var(--border-strong);
   border-radius: 9px;
-  background: color-mix(in srgb, var(--primary) 10%, var(--surface));
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
   color: var(--primary-strong);
   font-size: 13px;
   font-weight: 600;
@@ -118,11 +118,12 @@
   transition: transform .15s, box-shadow .15s, background .15s, border-color .15s, color .15s;
 }
 
+/* 悬停只做一档淡淡的底色变化，避免整块变深蓝盖过导航本身。 */
 .home-cta:hover {
-  border-color: var(--primary);
-  background: var(--primary);
-  color: #fff;
-  box-shadow: 0 8px 20px -10px color-mix(in srgb, var(--primary) 70%, transparent);
+  border-color: var(--border-strong);
+  background: var(--surface-muted);
+  color: var(--primary-strong);
+  box-shadow: none;
   transform: translateY(-1px);
 }
 
@@ -361,6 +362,44 @@
   margin-bottom: 18px;
 }
 
+/* 未登录 / 无令牌时替换列表区，说明为什么看不到内容。 */
+.home-locked {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 56px 24px 60px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  text-align: center;
+}
+
+.home-locked-icon {
+  display: grid;
+  width: 52px;
+  height: 52px;
+  place-items: center;
+  border-radius: 14px;
+  background: var(--primary-soft);
+  color: var(--primary-strong);
+}
+
+.home-locked h2 {
+  font-size: 16px;
+}
+
+.home-locked p {
+  max-width: 460px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.home-locked .home-cta {
+  margin-top: 6px;
+}
+
 .home-tabs {
   display: inline-flex;
   gap: 3px;
@@ -479,6 +518,40 @@
   font: 10px/1.4 'Cascadia Mono', Consolas, monospace;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* 版本号与新版本角标同处卡片右上，角标在前，先被看到的是「有新版本」。 */
+.home-card-tags {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+}
+
+.home-new-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border-radius: 99px;
+  background: var(--success-soft);
+  color: var(--success);
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.home-new-badge::before {
+  content: '';
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+/* 深色底上的深绿底太闷，换成亮一档的绿字。 */
+:root.dark .home-new-badge {
+  color: #34d399;
 }
 
 .home-version {

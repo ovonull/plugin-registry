@@ -1,12 +1,12 @@
-name: napcatqq-service
+name: pluginhub
 
 services:
   backend:
-    image: ${BACKEND_IMAGE:-napcatqq-service-backend}:${IMAGE_TAG:-latest}
+    image: ${BACKEND_IMAGE:-pluginhub-backend}:${IMAGE_TAG:-latest}
     build:
       context: .
       dockerfile: backend/Dockerfile
-    container_name: napcatqq-service-backend
+    container_name: pluginhub-backend
     env_file:
       - ./.env
     environment:
@@ -16,9 +16,6 @@ services:
       # 默认使用 SQLite，数据库文件落在挂载的 data 目录里；
       # 改成 MySQL 时在 .env 覆盖 DATABASE_URL 并启动 mysql profile。
       DATABASE_URL: ${DATABASE_URL:-sqlite+aiosqlite:///./data/plugin_registry.db}
-    depends_on:
-      redis:
-        condition: service_healthy
     volumes:
       - ./data:/app/data
     ports:
@@ -33,14 +30,14 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     networks:
-      - napcatqq-service-network
+      - pluginhub-network
 
   mysql:
     # 默认不启动：平台默认使用 SQLite。需要 MySQL 时执行
     # docker compose --profile mysql up -d，并在 .env 里把 DATABASE_URL 换成 MySQL 连接串。
     profiles: ["mysql"]
     image: mysql:8.0
-    container_name: napcatqq-service-mysql
+    container_name: pluginhub-mysql
     env_file:
       - ./.env
     environment:
@@ -60,35 +57,14 @@ services:
       start_period: 30s
     restart: unless-stopped
     networks:
-      - napcatqq-service-network
-
-  redis:
-    image: redis:7-alpine
-    container_name: napcatqq-service-redis
-    env_file:
-      - ./.env
-    environment:
-      TZ: ${TZ:-Asia/Shanghai}
-      REDIS_PASSWORD: ${REDIS_PASSWORD:-CHANGE_ME}
-    command: ["sh", "-c", "exec redis-server --requirepass \"$$REDIS_PASSWORD\" --appendonly yes"]
-    volumes:
-      - ./data/redis:/data
-    healthcheck:
-      test: ["CMD-SHELL", "redis-cli --no-auth-warning -a \"$$REDIS_PASSWORD\" ping | grep -q PONG"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 5s
-    restart: unless-stopped
-    networks:
-      - napcatqq-service-network
+      - pluginhub-network
 
   frontend:
-    image: ${FRONTEND_IMAGE:-napcatqq-service-frontend}:${IMAGE_TAG:-latest}
+    image: ${FRONTEND_IMAGE:-pluginhub-frontend}:${IMAGE_TAG:-latest}
     build:
       context: .
       dockerfile: frontend/Dockerfile
-    container_name: napcatqq-service-frontend
+    container_name: pluginhub-frontend
     depends_on:
       backend:
         condition: service_healthy
@@ -102,8 +78,8 @@ services:
       retries: 3
       start_period: 10s
     networks:
-      - napcatqq-service-network
+      - pluginhub-network
 
 networks:
-  napcatqq-service-network:
-    name: napcatqq-service-network
+  pluginhub-network:
+    name: pluginhub-network

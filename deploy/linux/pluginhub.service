@@ -1,0 +1,33 @@
+# PlugHub 插件库 systemd 单元
+#
+# 生产环境推荐用 systemd 代替 start.sh 的后台进程模式：
+# 开机自启、异常退出自动重启、日志统一进 journald。
+#
+# 用法：
+#   1. 把项目放到 /opt/pluginhub，按 README 准备好 .venv 与 frontend/dist
+#   2. sudo cp deploy/linux/pluginhub.service /etc/systemd/system/
+#   3. 按实际路径修改 WorkingDirectory / User
+#   4. sudo systemctl daemon-reload && sudo systemctl enable --now pluginhub
+#   5. journalctl -u pluginhub -f 查看日志
+
+[Unit]
+Description=PlugHub Plugin Registry
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pluginhub
+Group=pluginhub
+WorkingDirectory=/opt/pluginhub/backend
+Environment=PORT=8120
+Environment=FRONTEND_DIST=/opt/pluginhub/frontend/dist
+ExecStart=/opt/pluginhub/.venv/bin/python main.py
+Restart=always
+RestartSec=5
+# 优雅停止：收到 SIGTERM 后最多等 30 秒，避免正在写的数据库文件被硬切。
+KillSignal=SIGTERM
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

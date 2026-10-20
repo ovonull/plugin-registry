@@ -108,6 +108,12 @@ class Settings:
     # 可选的 GitHub 令牌，只用于「自动探测最新版本」时提高接口调用频率上限，
     # 不填也能用（未认证调用每小时 60 次，够单机用）。
     plugin_repo_token: str = ""
+    # 插件库对外接口的接入令牌：下游插件市场读取索引
+    # 与下载插件包时必须携带。留空表示只允许已登录账号访问。
+    registry_token: str = ""
+    # 裸机部署时可让后端顺带托管前端构建产物，实现单进程单端口；
+    # 留空表示由 Nginx 等外部服务托管（Docker 部署即如此）。
+    frontend_dist: str = ""
     # 插件执行方式：null 只登记与审核、不执行代码；subprocess 由独立子进程运行插件。
     plugin_runtime: str = "subprocess"
     # 单条事件交给插件的处理超时，以及插件出网请求的超时，单位均为秒。
@@ -162,6 +168,8 @@ class Settings:
             plugin_package_max_size=_read_int("PLUGIN_PACKAGE_MAX_SIZE", 10485760),
             plugin_repo_timeout=_read_int("PLUGIN_REPO_TIMEOUT", 60),
             plugin_repo_token=os.getenv("PLUGIN_REPO_TOKEN", "").strip(),
+            registry_token=os.getenv("REGISTRY_TOKEN", "").strip(),
+            frontend_dist=os.getenv("FRONTEND_DIST", "").strip(),
             plugin_runtime=os.getenv("PLUGIN_RUNTIME", "subprocess").strip().lower()
             or "subprocess",
             plugin_event_timeout=_read_int("PLUGIN_EVENT_TIMEOUT", 10),

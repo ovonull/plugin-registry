@@ -2,7 +2,7 @@
 
 from collections.abc import AsyncIterator
 
-from fastapi import Request
+from fastapi import Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.common.responses import BusinessError
@@ -49,4 +49,38 @@ def verify_service_token(request: Request) -> None:
     )
     if not supplied or not secure_equals(supplied, expected):
         raise BusinessError("服务访问令牌无效", 40303)
+
+
+async def require_registry_access(
+    request: Request, session: AsyncSession = Depends(get_session)
+) -> str:
+    """
+    校验插件库对外接口的访问权限。
+
+    接受两种身份：
+    1. 下游程序携带的接入令牌（``Authorization: Bearer <token>`` 或 ``X-Registry-Token``），
+       需与后台「插件同步 → 接入令牌」里配置的值一致；
+    2. 已登录账号的会话令牌，供前端页面直接调用。
+
+    Returns:
+        ``service`` 表示接入令牌通过，``user`` 表示登录账号通过。
+    Raises:
+        BusinessError: 两种方式都没有通过。
+    """
+    supplied = extract_bearer_token(request) or str(
+        request.headers.get("x-registry-token", "")
+    ).strip()
+    expected = getattr(request.app.state.container.settings, "registry_token", "")
+    if expected and supplied and secure_equals(supplied, expected):
+        return "service"
+    try:
+        await request.app.state.container.user_service.get_current_user(
+            session, supplied
+        )
+        return "user"
+    except BusinessError as error:
+        raise BusinessError(
+            "需要登录账号，或提供有效的插件库接入令牌",
+            40100,
+        ) from error
 

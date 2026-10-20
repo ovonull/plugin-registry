@@ -36,7 +36,7 @@ def _log_level(value: str) -> int:
 
 def _file_path(value: str) -> Path:
     """解析日志文件路径并确保父目录存在。"""
-    path = Path(value or "./data/logs/napcat_service.log").expanduser()
+    path = Path(value or "./data/logs/plugin_registry.log").expanduser()
     path.parent.mkdir(parents=True, exist_ok=True)
     return path
 

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
-import { Mail, Palette, Save, TextCursorInput, Github, RefreshCcw } from 'lucide-vue-next'
+import { Mail, Palette, Save, TextCursorInput, Github, RefreshCcw, KeyRound } from 'lucide-vue-next'
 import { settingsApi } from '../api'
 import LoadingOverlay from '../components/common/LoadingOverlay.vue'
 import PasswordInput from '../components/common/PasswordInput.vue'
@@ -13,23 +13,25 @@ import type {
   GithubSettings,
   IntroductionSettings,
   PluginSyncSettings,
+  RegistrySettings,
 } from '../types'
 
-type Tab = 'email' | 'appearance' | 'introduction' | 'github' | 'plugin_sync'
+type Tab = 'email' | 'appearance' | 'introduction' | 'github' | 'plugin_sync' | 'registry'
 const activeTab = ref<Tab>('email')
 const loaded = reactive<Record<Tab, boolean>>({
-  email: false, appearance: false, introduction: false, github: false, 'plugin_sync': false,
+  email: false, appearance: false, introduction: false, github: false, plugin_sync: false, registry: false,
 })
 const loading = ref(false)
 const saving = ref(false)
 const toast = useToast()
 const theme = useTheme()
 const system = useSystemSettings()
-const email = reactive<EmailSettings>({ host: '', port: 465, username: '', password: '', sender_name: 'NapCatQQ 插件库', use_ssl: true })
+const email = reactive<EmailSettings>({ host: '', port: 465, username: '', password: '', sender_name: 'PlugHub 插件库', use_ssl: true })
 const appearance = reactive<AppearanceSettings>({ color: 'ocean', font: 'system', effect: 'solid' })
-const introduction = reactive<IntroductionSettings>({ name: 'NapCatQQ 插件库', description: 'NapCatQQ 插件分发与审核平台' })
+const introduction = reactive<IntroductionSettings>({ name: 'PlugHub 插件库', description: 'PlugHub 插件分发与审核平台' })
 const github = reactive<GithubSettings>({ plugin_repo_token: '' })
 const pluginSync = reactive<PluginSyncSettings>({ enabled: true, interval_seconds: 21600, batch: 20 })
+const registry = reactive<RegistrySettings>({ token: '' })
 
 // 界面上用小时更直观，落库仍存秒，避免后端再做单位换算。
 const intervalHours = computed({
@@ -44,6 +46,7 @@ const tabs = [
   { value: 'appearance' as const, label: '主题与字体', icon: Palette },
   { value: 'introduction' as const, label: '系统介绍', icon: TextCursorInput },
   { value: 'plugin_sync' as const, label: '插件同步', icon: RefreshCcw },
+  { value: 'registry' as const, label: '接入令牌', icon: KeyRound },
   { value: 'github' as const, label: 'GitHub 接口', icon: Github },
 ]
 
@@ -61,6 +64,7 @@ async function loadGroup(group: Tab) {
   if (group === 'introduction') Object.assign(introduction, result.data)
   if (group === 'github') Object.assign(github, result.data)
   if (group === 'plugin_sync') Object.assign(pluginSync, result.data)
+  if (group === 'registry') Object.assign(registry, result.data)
   loaded[group] = true
 }
 
@@ -118,6 +122,21 @@ async function savePluginSync() {
   toast.show(result.message, 'success')
 }
 
+/** 生成一个足够随机的接入令牌，省得用户自己想。 */
+function generateRegistryToken() {
+  const random = crypto.randomUUID().replace(/-/g, '')
+  registry.token = `reg_${random}${crypto.randomUUID().replace(/-/g, '').slice(0, 8)}`
+}
+
+async function saveRegistry() {
+  saving.value = true
+  const result = await settingsApi.saveRegistry(registry)
+  saving.value = false
+  if (!result.success) return toast.show(result.message, 'error')
+  Object.assign(registry, result.data)
+  toast.show(result.message, 'success')
+}
+
 onMounted(() => loadGroup('email'))
 </script>
 
@@ -159,6 +178,25 @@ onMounted(() => loadGroup('email'))
         </div>
         <p class="form-hint">审核规则：插件首次入库需人工审核；已有审核通过的版本后，新版本自动免审上架；信任名单作者与管理员免审直接上架；被管理员下架过的插件只免审通过，不会自动重新上架。</p>
         <div class="form-actions"><button class="button primary" type="submit" :disabled="saving"><span v-if="saving" class="button-spinner" /><Save :size="16" />保存同步设置</button></div>
+      </form>
+      <LoadingOverlay :visible="loading" contained />
+    </section>
+
+    <section v-else-if="activeTab === 'registry'" class="content-panel settings-module">
+      <div class="panel-heading"><div><h2><KeyRound :size="18" />插件库接入令牌</h2><p>索引、插件列表与插件包下载都需要鉴权，下游插件市场靠这枚令牌访问。</p></div></div>
+      <form class="settings-form" @submit.prevent="saveRegistry">
+        <label>接入令牌
+          <PasswordInput v-model="registry.token" placeholder="reg_..." />
+          <small>下游请求时带上 <code>Authorization: Bearer &lt;令牌&gt;</code> 或 <code>X-Registry-Token</code>。留空表示只有已登录账号能访问。</small>
+        </label>
+        <div class="form-actions">
+          <button type="button" class="button secondary" @click="generateRegistryToken">随机生成</button>
+          <button class="button primary" type="submit" :disabled="saving"><span v-if="saving" class="button-spinner" /><Save :size="16" />保存令牌</button>
+        </div>
+        <p class="form-hint">
+          已登录用户访问首页时走账号会话，不受这里影响；这枚令牌用于给下游插件市场这类程序放行。
+          令牌以加密形式存库，读取时只显示掩码；保存后立即生效，无需重启。
+        </p>
       </form>
       <LoadingOverlay :visible="loading" contained />
     </section>

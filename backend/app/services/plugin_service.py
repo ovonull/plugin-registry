@@ -188,6 +188,11 @@ class PluginService:
 
         package = self.source_service.prepare_package(archive)
         manifest = package.manifest
+        # 同时存档提交时的原始压缩包：下游插件市场下载这份字节，
+        # sha256 与入库 checksum 一致，可以做到下载后直接校验。
+        self.source_service.save_archive(
+            archive, package.plugin_id, package.version
+        )
 
         existing_version = await session.scalar(
             select(PluginVersion).where(
@@ -430,6 +435,112 @@ class PluginService:
                 )
                 for row in rows
             ],
+            "page": page,
+            "page_size": page_size,
+            "total": total,
+            "pages": max(1, (total + page_size - 1) // page_size),
+        }
+
+    async def list_my_plugins(
+        self,
+        session: AsyncSession,
+        user: User,
+        page: int,
+        page_size: int,
+        keyword: str = "",
+        review_status: str = "",
+    ) -> dict[str, Any]:
+        """
+        分页查询当前账号提交过的插件及其最新提交版本。
+
+        与「已安装插件」不同，这里回答的是「我传了哪些插件、审到哪一步了」，
+        因此按 owner_id 过滤，并额外带上最新版本、版本总数与待审核数量。
+
+        Args:
+            session: 数据库会话。
+            user: 当前登录用户。
+            page: 页码，从 1 开始。
+            page_size: 每页条数。
+            keyword: 插件标识或名称关键字。
+            review_status: 按最新提交版本的审核状态过滤。
+        Returns:
+            含 items、page、page_size、total、pages 的分页结果。
+        """
+        conditions = [Plugin.is_deleted.is_(False), Plugin.owner_id == user.id]
+        if keyword:
+            conditions.append(
+                or_(
+                    Plugin.plugin_id.contains(keyword, autoescape=True),
+                    Plugin.name.contains(keyword, autoescape=True),
+                )
+            )
+        rows = list(
+            (
+                await session.scalars(
+                    select(Plugin).where(*conditions).order_by(Plugin.id.desc())
+                )
+            ).all()
+        )
+
+        plugin_ids = [row.plugin_id for row in rows]
+        versions: list[PluginVersion] = []
+        if plugin_ids:
+            versions = list(
+                (
+                    await session.scalars(
+                        select(PluginVersion)
+                        .where(
+                            PluginVersion.plugin_id.in_(plugin_ids),
+                            PluginVersion.is_deleted.is_(False),
+                        )
+                        .order_by(PluginVersion.id.desc())
+                    )
+                ).all()
+            )
+        latest: dict[str, PluginVersion] = {}
+        version_counts: dict[str, int] = {}
+        pending_counts: dict[str, int] = {}
+        for version in versions:
+            version_counts[version.plugin_id] = version_counts.get(version.plugin_id, 0) + 1
+            if version.review_status == REVIEW_STATUS_PENDING:
+                pending_counts[version.plugin_id] = pending_counts.get(version.plugin_id, 0) + 1
+            # 已按 id 倒序，第一次出现的即最新提交版本。
+            latest.setdefault(version.plugin_id, version)
+
+        status = str(review_status or "").strip()
+        if status:
+            rows = [
+                row
+                for row in rows
+                if latest.get(row.plugin_id) is not None
+                and latest[row.plugin_id].review_status == status
+            ]
+
+        total = len(rows)
+        page = max(1, page)
+        page_size = max(1, page_size)
+        start = (page - 1) * page_size
+        page_rows = rows[start : start + page_size]
+        current_versions = await self._current_versions(session, page_rows)
+        owner_names = await self._owner_names(
+            session, {row.owner_id for row in page_rows}
+        )
+        items = []
+        for row in page_rows:
+            item = serialize_plugin(
+                row,
+                current_versions.get(row.current_version_id),
+                owner_names.get(row.owner_id),
+            )
+            latest_version = latest.get(row.plugin_id)
+            item["latest_version"] = (
+                serialize_version(latest_version) if latest_version is not None else None
+            )
+            item["version_count"] = version_counts.get(row.plugin_id, 0)
+            item["pending_count"] = pending_counts.get(row.plugin_id, 0)
+            items.append(item)
+        return {
+            "items": items,
             "page": page,
             "page_size": page_size,
             "total": total,

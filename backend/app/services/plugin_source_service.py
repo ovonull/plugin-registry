@@ -200,7 +200,7 @@ class PluginSourceService:
         """GitHub 接口请求头，配置了令牌就带上以放宽频率限制。"""
         headers = {
             "Accept": "application/vnd.github+json",
-            "User-Agent": "NapCatQQ-Service-PluginMarket",
+            "User-Agent": "PlugHub-PluginRegistry",
         }
         token = str(self.settings.plugin_repo_token or "").strip()
         if token:
@@ -498,6 +498,26 @@ class PluginSourceService:
             )
             return False, "", f"插件包目录删除失败：{error}"
         return True, str(target), ""
+
+    def archive_dir(self) -> Path:
+        """原始压缩包存档目录，与归一化后的包目录分开存放。"""
+        return self.data_root / "archives"
+
+    def save_archive(self, content: bytes, plugin_id: str, version: str) -> Path:
+        """
+        保存提交时的原始压缩包。
+
+        下游插件市场下载的是这份原始字节，其 sha256 与入库的 checksum 完全一致，
+        因此可以做到「下载后校验和比对」。归一化目录只服务于本机运行与审核。
+        """
+        target = self.archive_dir() / plugin_id / f"{version}.zip"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(content)
+        return target
+
+    def archive_path(self, plugin_id: str, version: str) -> Path:
+        """返回已存档的原始压缩包路径，不存在时返回不存在的路径由调用方判断。"""
+        return self.archive_dir() / plugin_id / f"{version}.zip"
 
     def prepare_package(self, content: bytes) -> ExtractedPackage:
         """

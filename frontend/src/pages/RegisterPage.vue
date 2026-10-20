@@ -97,9 +97,9 @@ system.loadPublic()
 <template>
   <div class="auth-page">
     <section class="auth-brand">
-      <div class="brand-mark"><img src="/napcat-logo.png" alt="NapCatQQ" /></div>
+      <div class="brand-mark"><img src="/napcat-logo.png" alt="PlugHub" /></div>
       <div>
-        <p class="eyebrow">NAPCATQQ SERVICE</p>
+        <p class="eyebrow">PLUGHUB</p>
         <h1>{{ system.state.introduction.name }}</h1>
         <p class="brand-description">{{ system.state.introduction.description }}</p>
       </div>
@@ -108,7 +108,7 @@ system.loadPublic()
     </section>
     <section class="auth-panel register-panel">
       <div class="auth-form-wrap">
-        <div class="mobile-auth-logo"><img src="/napcat-logo.png" alt="NapCatQQ" /></div>
+        <div class="mobile-auth-logo"><img src="/napcat-logo.png" alt="PlugHub" /></div>
         <p class="eyebrow">创建账号</p>
         <h2>注册普通用户</h2>
         <p class="auth-subtitle">完成邮箱验证后即可进入管理后台</p>
@@ -128,7 +128,7 @@ system.loadPublic()
         </form>
         <p class="auth-switch">已有账号？<RouterLink to="/login">返回登录</RouterLink></p>
       </div>
-      <footer class="auth-footer">NapCatQQ 插件库 · 插件分发与审核平台</footer>
+      <footer class="auth-footer">PlugHub 插件库 · 插件分发与审核平台</footer>
     </section>
     <LoadingOverlay :visible="loading" text="正在创建账号…" />
   </div>

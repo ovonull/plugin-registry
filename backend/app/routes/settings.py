@@ -13,6 +13,7 @@ from app.schemas import (
     GithubSettingsRequest,
     IntroductionSettingsRequest,
     PluginSyncSettingsRequest,
+    RegistrySettingsRequest,
 )
 from app.services.setting_service import SettingService
 
@@ -92,6 +93,23 @@ async def save_github(
             request.app.state.container.settings, "plugin_repo_token", token
         )
     return success(data, "GitHub 接口设置已保存")
+
+
+@router.put("/registry/save")
+async def save_registry(
+    payload: RegistrySettingsRequest,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """保存插件库接入令牌，并立即作用于分发接口的鉴权。"""
+    await _require_admin(request, session)
+    data = await SettingService(session).save_group("registry", payload.model_dump())
+    token = str(payload.token or "").strip()
+    if token != "******":
+        object.__setattr__(
+            request.app.state.container.settings, "registry_token", token
+        )
+    return success(data, "接入令牌已保存")
 
 
 @router.put("/plugin-sync/save")

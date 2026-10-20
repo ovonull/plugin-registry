@@ -3,9 +3,9 @@ requires = ["setuptools>=75"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "napcat-service-backend"
+name = "pluginhub-backend"
 version = "0.1.0"
-description = "NapCatQQ management and OneBot gateway service"
+description = "PlugHub 插件库后端：插件分发、审核与索引服务"
 requires-python = ">=3.11"
 dependencies = [
   "aiomysql>=0.2.0,<1.0.0",

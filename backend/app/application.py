@@ -3,11 +3,14 @@
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 import logging
+from pathlib import Path
 from typing import AsyncIterator
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from redis.asyncio import Redis
 from sqlalchemy import text
 
@@ -121,6 +124,46 @@ def _validation_message(error: RequestValidationError) -> str:
     if error_type == "missing":
         return f"缺少必填参数：{field_name}"
     return f"参数 {field_name} 格式或取值不正确"
+
+
+def _mount_frontend(app: FastAPI, settings: Settings) -> None:
+    """
+    可选地把前端构建产物挂到后端，供「Linux 裸机部署」单端口运行。
+
+    Docker 部署时前端由独立 Nginx 容器处理，``FRONTEND_DIST`` 为空直接跳过；
+    裸机部署由 start.sh 先构建前端，再由这里托管，省去再装一个 Nginx。
+    """
+    raw_dir = str(settings.frontend_dist or "").strip()
+    if not raw_dir:
+        return
+    dist_dir = Path(raw_dir).expanduser().resolve()
+    if not (dist_dir / "index.html").is_file():
+        logger.warning(
+            "已配置 FRONTEND_DIST 但目录里没有 index.html，跳过静态托管：%s（请先执行 npm run build）",
+            dist_dir,
+        )
+        return
+
+    assets_dir = dist_dir / "assets"
+    if assets_dir.is_dir():
+        app.mount(
+            "/assets",
+            StaticFiles(directory=str(assets_dir)),
+            name="frontend-assets",
+        )
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    async def frontend_spa(full_path: str) -> FileResponse:
+        """前端单页回退：命中静态文件就返回文件，否则交给 index.html。"""
+        if full_path == "api" or full_path.startswith("api/"):
+            raise HTTPException(status_code=404, detail="Not Found")
+        target = (dist_dir / full_path).resolve()
+        # 只允许返回 dist 目录内的文件，避免构造路径读到项目其他文件。
+        if target.is_file() and str(target).startswith(str(dist_dir)):
+            return FileResponse(target)
+        return FileResponse(dist_dir / "index.html")
+
+    logger.info("前端静态资源已由后端托管：%s", dist_dir)
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -256,6 +299,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     "plugin_repo_token",
                     str(github_settings.get("plugin_repo_token") or "").strip(),
                 )
+            # 插件库接入令牌：.env 显式配置时优先，否则读取后台保存的值。
+            if not app_settings.registry_token:
+                registry_settings = await setting_service.get_group(
+                    "registry", mask_sensitive=False
+                )
+                object.__setattr__(
+                    app_settings,
+                    "registry_token",
+                    str(registry_settings.get("token") or "").strip(),
+                )
             # 仓库插件自动同步的配置只以数据库为准（后台系统设置里维护），
             # 因此每次启动都把库里保存的值注入运行时，不受 .env 影响。
             sync_settings = await setting_service.get_group("plugin_sync")
@@ -294,7 +347,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             await database.close()
 
     app = FastAPI(
-        title="NapCatQQ 插件库",
+        title="PlugHub 插件库",
         version="0.1.0",
         lifespan=lifespan,
     )
@@ -367,5 +420,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         """记录未知错误上下文，不向前端暴露堆栈。"""
         logger.exception("接口处理异常，path=%s，错误=%s", request.url.path, error)
         return failure_response("服务处理失败，请稍后重试", 50000)
+
+    # 裸机部署：配置了 FRONTEND_DIST 时由后端顺带托管前端构建产物，
+    # 一个进程一个端口就能跑；Docker 部署走 Nginx，留空即可。
+    _mount_frontend(app, app_settings)
 
     return app

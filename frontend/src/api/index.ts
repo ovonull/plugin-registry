@@ -60,6 +60,7 @@ import type {
   PluginInstallation,
   PluginInstallationUpdatePayload,
   PluginItem,
+  MyPluginItem,
   PluginRepoProbeResult,
   PluginRepoSubmitPayload,
   PluginReviewLog,
@@ -69,6 +70,7 @@ import type {
   PluginVersionInfo,
   PluginSyncSettings,
   RegistryPlugin,
+  RegistrySettings,
   RegistryStats,
 } from '../types'
 
@@ -165,6 +167,8 @@ export const settingsApi = {
     request<GithubSettings>({ url: '/settings/github/save', method: 'PUT', data: payload }),
   savePluginSync: (payload: PluginSyncSettings) =>
     request<PluginSyncSettings>({ url: '/settings/plugin-sync/save', method: 'PUT', data: payload }),
+  saveRegistry: (payload: RegistrySettings) =>
+    request<RegistrySettings>({ url: '/settings/registry/save', method: 'PUT', data: payload }),
 }
 
 export interface RuleQuery {
@@ -421,7 +425,7 @@ export interface RegistryPluginQuery {
   page: number
   page_size: number
   keyword?: string
-  sort?: 'latest' | 'popular' | 'name'
+  sort?: 'all' | 'latest' | 'popular' | 'name'
 }
 
 export const registryApi = {
@@ -450,6 +454,9 @@ export interface PluginSubmitResult {
 export const pluginApi = {
   list: (params: PluginQuery) =>
     request<Pagination<PluginItem>>({ url: '/plugins', params }),
+  // 我提交过的插件及其最新审核进度，与「已安装」是两回事。
+  mine: (params: { page: number; page_size: number; keyword?: string; review_status?: string }) =>
+    request<Pagination<MyPluginItem>>({ url: '/plugins/mine', params }),
   detail: (pluginId: string) =>
     request<PluginDetail>({ url: `/plugins/${pluginId}` }),
   capabilities: () =>

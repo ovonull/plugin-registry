@@ -2,7 +2,7 @@
 
 从数据库读取已上架插件及其当前生效版本，输出两类公开数据：
 
-1. ``registry/index.json``：供 NapCatQQ Service 插件市场定时同步安装；
+1. ``registry/index.json``：供下游插件市场定时同步安装；
 2. 插件展示首页需要的列表、详情与统计（无需登录即可访问）。
 
 说明：公开数据只包含已上架且当前版本审核通过的插件，任何待审核、
@@ -12,21 +12,25 @@
 from dataclasses import dataclass
 from datetime import datetime, timezone
 import json
+from pathlib import Path
 from typing import Any
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.common.config import Settings
 from app.models.plugin import Plugin, PluginInstallation, PluginVersion
 
 
 SCHEMA_VERSION = 1
 
-# 首页排序可选值，非法值统一回落到最新发布。
+# 首页排序可选值，非法值统一回落到「全部」。
+# all 是总览（按插件标识稳定排序），其余三个是明确的排序方式。
+SORT_ALL = "all"
 SORT_LATEST = "latest"
 SORT_POPULAR = "popular"
 SORT_NAME = "name"
-SORT_CHOICES = (SORT_LATEST, SORT_POPULAR, SORT_NAME)
+SORT_CHOICES = (SORT_ALL, SORT_LATEST, SORT_POPULAR, SORT_NAME)
 
 
 @dataclass(slots=True)
@@ -79,7 +83,12 @@ class RegistryExportService:
             return raw.strip(), plugin.author_url or ""
         return plugin.author_name or "", plugin.author_url or ""
 
-    def _version_payload(self, plugin: Plugin, version: PluginVersion) -> dict[str, Any]:
+    def _version_payload(
+        self,
+        plugin: Plugin,
+        version: PluginVersion,
+        package_url: str = "",
+    ) -> dict[str, Any]:
         """把插件与当前版本转换为索引条目。"""
         manifest = self._parse_manifest(version.manifest_json)
         author_name, _ = self._author_fields(manifest, plugin)
@@ -97,7 +106,7 @@ class RegistryExportService:
             "source_type": plugin.source_type,
             "repo_url": plugin.repo_url or "",
             "source_ref": version.source_ref or "",
-            "package_url": "",
+            "package_url": package_url,
             "checksum": version.checksum or "",
             "capabilities": manifest.get("capabilities") or [],
             "min_host_version": version.min_host_version or "",
@@ -105,6 +114,17 @@ class RegistryExportService:
             "changelog": str(manifest.get("changelog") or ""),
             "published_at": published_at,
         }
+
+    @staticmethod
+    def package_path_of(plugin_id: str, version: str) -> str:
+        """公开的插件包下载路径，相对站点根路径。"""
+        return f"/api/registry/packages/{plugin_id}/{version}.zip"
+
+    def package_url_of(self, plugin_id: str, version: str, settings: Settings | None) -> str:
+        """拼接插件包下载地址：配置了公开基址时给绝对地址，否则给相对路径。"""
+        path = self.package_path_of(plugin_id, version)
+        base = str(getattr(settings, "public_service_url", "") or "").strip()
+        return f"{base.rstrip('/')}{path}" if base else path
 
     def _public_entry(
         self,
@@ -169,10 +189,19 @@ class RegistryExportService:
             pairs.append((plugin, version))
         return pairs
 
-    async def build_index(self, session: AsyncSession) -> dict[str, Any]:
-        """生成完整的公开索引数据。"""
+    async def build_index(
+        self, session: AsyncSession, settings: Settings | None = None
+    ) -> dict[str, Any]:
+        """生成完整的公开索引数据，包地址按配置拼成绝对或相对路径。"""
         pairs = await self._published_pairs(session)
-        entries = [self._version_payload(plugin, version) for plugin, version in pairs]
+        entries = [
+            self._version_payload(
+                plugin,
+                version,
+                self.package_url_of(plugin.plugin_id, version.version, settings),
+            )
+            for plugin, version in pairs
+        ]
         entries.sort(key=lambda item: item["plugin_id"])
         return {
             "schema_version": SCHEMA_VERSION,
@@ -180,11 +209,59 @@ class RegistryExportService:
             "plugins": entries,
         }
 
+    async def package_archive(
+        self,
+        session: AsyncSession,
+        plugin_id: str,
+        version_text: str,
+        settings: Settings,
+    ) -> bytes | None:
+        """
+        读取指定版本提交时存档的原始压缩包，供下游插件市场下载安装。
+
+        只允许分发「已上架插件 + 当前生效版本 + 审核通过」的包；
+        返回的就是提交时那份原始 zip，sha256 与索引里的 checksum 一致，
+        下游下载后可以直接比对，不必重新归一化。
+        """
+        plugin = await session.scalar(
+            select(Plugin).where(
+                Plugin.plugin_id == plugin_id,
+                Plugin.is_deleted.is_(False),
+            )
+        )
+        if plugin is None or not plugin.is_published or not plugin.current_version_id:
+            return None
+        version = await session.scalar(
+            select(PluginVersion).where(
+                PluginVersion.plugin_id == plugin_id,
+                PluginVersion.version == version_text,
+                PluginVersion.is_deleted.is_(False),
+            )
+        )
+        if (
+            version is None
+            or version.review_status != "approved"
+            or version.id != plugin.current_version_id
+        ):
+            return None
+
+        data_root = Path(settings.plugin_data_dir).expanduser().resolve()
+        archive = data_root / "archives" / plugin_id / f"{version_text}.zip"
+        try:
+            archive.resolve().relative_to(data_root)
+        except ValueError:
+            return None
+        if not archive.is_file():
+            return None
+        if archive.stat().st_size > settings.plugin_package_max_size:
+            return None
+        return archive.read_bytes()
+
     async def list_plugins(
         self,
         session: AsyncSession,
         keyword: str = "",
-        sort: str = SORT_LATEST,
+        sort: str = SORT_ALL,
         page: int = 1,
         page_size: int = 12,
     ) -> dict[str, Any]:
@@ -212,6 +289,9 @@ class RegistryExportService:
             entries.sort(key=lambda item: (-item["install_count"], item["name"].lower()))
         elif sort == SORT_NAME:
             entries.sort(key=lambda item: item["name"].lower())
+        elif sort == SORT_ALL:
+            # 「全部」是稳定总览，按插件标识排，翻页时顺序不会跳动。
+            entries.sort(key=lambda item: item["plugin_id"])
         else:
             entries.sort(key=lambda item: (item["published_at"] or "", item["name"].lower()), reverse=True)
 

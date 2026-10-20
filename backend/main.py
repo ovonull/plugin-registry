@@ -1,4 +1,4 @@
-"""NapCatQQ 插件库后端统一启动入口。"""
+"""PlugHub 插件库后端统一启动入口。"""
 
 import uvicorn
 

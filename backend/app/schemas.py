@@ -191,6 +191,15 @@ class PluginSyncSettingsRequest(BaseModel):
     batch: int = Field(default=20, ge=1, le=100)
 
 
+class RegistrySettingsRequest(BaseModel):
+    """插件库接入令牌设置参数。"""
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    # 允许留空：留空表示只有已登录账号能访问分发接口。
+    token: str = Field(default="", max_length=128)
+
+
 class AutoReplyCreateRequest(BaseModel):
     """自动回复规则新增参数。"""
 

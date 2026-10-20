@@ -42,8 +42,11 @@ GROUP_KEYS: dict[str, dict[str, str]] = {
         "interval_seconds": "plugin_sync.interval_seconds",
         "batch": "plugin_sync.batch",
     },
+    "registry": {
+        "token": "registry.token",
+    },
 }
-SENSITIVE_KEYS = {"smtp.password", "github.plugin_repo_token"}
+SENSITIVE_KEYS = {"smtp.password", "github.plugin_repo_token", "registry.token"}
 PUBLIC_GROUPS = ("appearance", "introduction")
 # 读取时需要还原成布尔与整数的字段，其余一律按字符串返回。
 BOOL_FIELDS = {"use_ssl", "enabled"}
@@ -54,13 +57,13 @@ DEFAULTS = {
         "port": "465",
         "username": "",
         "password": "",
-        "sender_name": "NapCatQQ 插件库",
+        "sender_name": "PlugHub 插件库",
         "use_ssl": "true",
     },
     "appearance": {"color": "ocean", "font": "system", "effect": "solid"},
     "introduction": {
-        "name": "NapCatQQ 插件库",
-        "description": "NapCatQQ 插件分发与审核平台",
+        "name": "PlugHub 插件库",
+        "description": "PlugHub 插件分发与审核平台",
     },
     "animated_emoji": {
         "classification_prompt": (
@@ -80,6 +83,7 @@ DEFAULTS = {
         "interval_seconds": "21600",
         "batch": "20",
     },
+    "registry": {"token": ""},
 }
 
 

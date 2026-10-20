@@ -144,6 +144,11 @@ export interface PluginSyncSettings {
   batch: number
 }
 
+/** 插件库分发接口的接入令牌设置。 */
+export interface RegistrySettings {
+  token: string
+}
+
 export interface AutoReplyRule {
   id: number
   owner_id: number
@@ -626,6 +631,13 @@ export interface PluginItem {
 export interface PluginDetail {
   plugin: PluginItem
   versions: PluginVersionInfo[]
+}
+
+/** 「我的插件」页：自己提交的插件 + 最新版本审核进度。 */
+export interface MyPluginItem extends PluginItem {
+  latest_version: PluginVersionInfo | null
+  version_count: number
+  pending_count: number
 }
 
 /** 插件库公开首页的插件条目，字段来自 /api/registry/plugins。 */

@@ -18,6 +18,8 @@ import {
   Flame,
   Github,
   Layers,
+  LayoutGrid,
+  Lock,
   LogIn,
   Moon,
   Package,
@@ -39,7 +41,7 @@ const auth = useAuth()
 const theme = useTheme()
 
 const keyword = ref('')
-const sort = ref<'latest' | 'popular' | 'name'>('latest')
+const sort = ref<'all' | 'latest' | 'popular' | 'name'>('all')
 const page = ref(1)
 const loading = ref(false)
 const plugins = ref<Pagination<RegistryPlugin>>({
@@ -51,9 +53,12 @@ const stats = ref<RegistryStats>({
 const detail = ref<RegistryPlugin | null>(null)
 const detailOpen = ref(false)
 const detailLoading = ref(false)
+// 接口需要鉴权：未登录访客只看到登录引导，不展示任何插件数据。
+const needAuth = ref(false)
 
 const loggedIn = computed(() => Boolean(auth.state.user))
 const sortOptions = [
+  { value: 'all' as const, label: '全部插件', icon: LayoutGrid },
   { value: 'latest' as const, label: '最近更新', icon: Sparkles },
   { value: 'popular' as const, label: '安装最多', icon: Flame },
   { value: 'name' as const, label: '名称排序', icon: Layers },
@@ -99,6 +104,28 @@ function formatDate(value: string): string {
   return date.toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' })
 }
 
+/** 新版本窗口：7 天内发布的版本在卡片上打「新版本」角标。 */
+const FRESH_DAYS = 7
+
+function isFresh(plugin: RegistryPlugin): boolean {
+  if (!plugin.published_at) return false
+  const time = new Date(plugin.published_at).getTime()
+  if (Number.isNaN(time)) return false
+  return Date.now() - time <= FRESH_DAYS * 24 * 60 * 60 * 1000
+}
+
+/** 相对时间，用于角标的悬浮提示。 */
+function timeAgo(value: string): string {
+  const time = new Date(value).getTime()
+  if (Number.isNaN(time)) return '未知时间'
+  const minutes = Math.floor((Date.now() - time) / 60000)
+  if (minutes < 60) return `${Math.max(1, minutes)} 分钟前`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours} 小时前`
+  const days = Math.floor(hours / 24)
+  return days <= 1 ? '昨天' : `${days} 天前`
+}
+
 async function loadPlugins() {
   loading.value = true
   const result = await registryApi.plugins({
@@ -108,12 +135,22 @@ async function loadPlugins() {
     sort: sort.value,
   })
   loading.value = false
-  if (result.success && result.data) plugins.value = result.data
+  if (!result.success) {
+    // 40100 表示未登录且没有接入令牌，此时页面切成登录引导。
+    if (result.code === 40100) needAuth.value = true
+    return
+  }
+  needAuth.value = false
+  if (result.data) plugins.value = result.data
 }
 
 async function loadStats() {
   const result = await registryApi.stats()
-  if (result.success && result.data) stats.value = result.data
+  if (!result.success) {
+    if (result.code === 40100) needAuth.value = true
+    return
+  }
+  if (result.data) stats.value = result.data
 }
 
 async function openDetail(plugin: RegistryPlugin) {
@@ -125,7 +162,7 @@ async function openDetail(plugin: RegistryPlugin) {
   if (result.success && result.data) detail.value = result.data
 }
 
-function changeSort(value: 'latest' | 'popular' | 'name') {
+function changeSort(value: 'all' | 'latest' | 'popular' | 'name') {
   if (sort.value === value) return
   sort.value = value
   page.value = 1
@@ -166,10 +203,10 @@ onMounted(() => {
     <header class="home-nav">
       <div class="home-nav-inner">
         <div class="home-brand">
-          <img src="/napcat-logo.png" alt="NapCat 插件库" />
+          <img src="/napcat-logo.png" alt="PlugHub 插件库" />
           <div>
-            <strong>NapCat 插件库</strong>
-            <span>PLUGIN REGISTRY</span>
+            <strong>PlugHub 插件库</strong>
+            <span>PLUGHUB</span>
           </div>
         </div>
         <nav class="home-nav-links">
@@ -225,7 +262,16 @@ onMounted(() => {
     </section>
 
     <main id="plugins" class="home-main">
-      <div class="home-toolbar">
+      <div v-if="needAuth" class="home-locked">
+        <div class="home-locked-icon"><Lock :size="24" /></div>
+        <h2>插件索引仅对授权对象开放</h2>
+        <p>索引、插件详情与插件包下载都需要鉴权。登录账号即可浏览，下游程序请使用接入令牌。</p>
+        <button type="button" class="home-cta" @click="enterConsole">
+          <LogIn :size="16" />登录 / 注册
+        </button>
+      </div>
+
+      <div v-if="!needAuth" class="home-toolbar">
         <div class="home-tabs">
           <button
             v-for="item in sortOptions"
@@ -240,11 +286,11 @@ onMounted(() => {
         <span class="home-count">共 {{ plugins.total }} 个插件</span>
       </div>
 
-      <div v-if="loading" class="home-skeleton-grid">
+      <div v-if="!needAuth && loading" class="home-skeleton-grid">
         <div v-for="index in 6" :key="index" class="home-skeleton" />
       </div>
 
-      <div v-else-if="plugins.items.length" class="home-grid">
+      <div v-else-if="!needAuth && plugins.items.length" class="home-grid">
         <article
           v-for="plugin in plugins.items"
           :key="plugin.plugin_id"
@@ -263,7 +309,14 @@ onMounted(() => {
               <h3>{{ plugin.name }}</h3>
               <code>{{ plugin.plugin_id }}</code>
             </div>
-            <span class="home-version">v{{ plugin.version }}</span>
+            <div class="home-card-tags">
+              <span
+                v-if="isFresh(plugin)"
+                class="home-new-badge"
+                :title="`该版本发布于 ${timeAgo(plugin.published_at)}`"
+              >新版本</span>
+              <span class="home-version">v{{ plugin.version }}</span>
+            </div>
           </div>
 
           <p class="home-card-desc">{{ plugin.summary || plugin.description || '作者尚未提供简介' }}</p>
@@ -289,9 +342,9 @@ onMounted(() => {
         </article>
       </div>
 
-      <EmptyState v-else text="没有匹配的插件，换个关键词试试" />
+      <EmptyState v-else-if="!needAuth" text="没有匹配的插件，换个关键词试试" />
 
-      <div v-if="plugins.pages > 1" class="home-pager">
+      <div v-if="!needAuth && plugins.pages > 1" class="home-pager">
         <button type="button" :disabled="page <= 1" @click="goPage(page - 1)">
           <ChevronLeft :size="16" />上一页
         </button>
@@ -341,7 +394,7 @@ onMounted(() => {
     </main>
 
     <footer class="home-footer">
-      <span>NapCat 插件库 · 插件分发与审核平台</span>
+      <span>PlugHub 插件库 · 插件分发与审核平台</span>
       <span>索引地址 <code>/api/registry/index.json</code></span>
     </footer>
 
@@ -398,7 +451,7 @@ onMounted(() => {
         </div>
 
         <p class="home-detail-hint">
-          在 NapCatQQ Service 的插件市场搜索 <code>{{ detail.plugin_id }}</code> 即可安装，
+          在插件市场搜索 <code>{{ detail.plugin_id }}</code> 即可安装，
           安装后默认关闭，需要你在「我的插件」里手动启用。
         </p>
       </div>

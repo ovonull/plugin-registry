@@ -183,7 +183,7 @@ class EmailService:
             "plain",
             "utf-8",
         )
-        sender_name = str(smtp.get("sender_name") or "NapCatQQ 插件库")
+        sender_name = str(smtp.get("sender_name") or "PlugHub 插件库")
         username = str(smtp["username"])
         message["Subject"] = Header(f"{action}验证码", "utf-8")
         message["From"] = formataddr((str(Header(sender_name, "utf-8")), username))

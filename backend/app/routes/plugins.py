@@ -73,6 +73,30 @@ async def list_plugins(
     return success(data)
 
 
+@router.get("/mine")
+async def list_my_plugins(
+    request: Request,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    keyword: str = Query("", max_length=100),
+    review_status: str = Query("", max_length=20),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """返回当前账号提交过的插件与最新审核状态，供「我的插件」页展示。"""
+    service = _plugin_service(request)
+    service.ensure_enabled(request.app.state.container.settings)
+    user = await get_current_user(request, session)
+    data = await service.list_my_plugins(
+        session,
+        user,
+        page,
+        page_size,
+        keyword.strip(),
+        review_status.strip(),
+    )
+    return success(data)
+
+
 @router.get("/capabilities")
 async def list_capabilities(
     request: Request,

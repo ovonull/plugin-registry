@@ -5,7 +5,7 @@ import { useAuth } from '../composables/useAuth'
 export const appRoutes: RouteRecordRaw[] = [
   { path: '/dashboard', name: 'dashboard', component: () => import('../pages/DashboardPage.vue'), meta: { title: '平台概览', menu: true, icon: 'dashboard' } },
   { path: '/plugins', name: 'plugins', component: () => import('../pages/PluginMarketPage.vue'), meta: { title: '插件市场', menu: true, icon: 'package' } },
-  { path: '/plugins/installed', name: 'plugin-installed', component: () => import('../pages/PluginInstalledPage.vue'), meta: { title: '我的插件', menu: true, icon: 'plug' } },
+  { path: '/plugins/mine', name: 'plugin-mine', component: () => import('../pages/MyPluginsPage.vue'), meta: { title: '我的插件', menu: true, icon: 'plug' } },
   { path: '/plugin-review', name: 'plugin-review', component: () => import('../pages/PluginReviewPage.vue'), meta: { title: '插件审核', menu: true, icon: 'shield-check', admin: true } },
   { path: '/profile', name: 'profile', component: () => import('../pages/ProfilePage.vue'), meta: { title: '个人设置', menu: true, icon: 'user' } },
   { path: '/settings', name: 'settings', component: () => import('../pages/SystemSettingsPage.vue'), meta: { title: '系统设置', menu: true, icon: 'settings', admin: true } },
@@ -52,7 +52,7 @@ router.beforeEach(async (to) => {
   }
   if (to.meta.admin && auth.state.user?.role_code !== 'admin') return { name: 'dashboard' }
   if ((to.name === 'login' || to.name === 'register') && loggedIn) return { name: 'dashboard' }
-  document.title = `${String(to.meta.title || '插件库')} - NapCatQQ 插件库`
+  document.title = `${String(to.meta.title || '插件库')} - PlugHub 插件库`
   return true
 })
 

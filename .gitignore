@@ -5,6 +5,9 @@ __pycache__/
 *.pyo
 data/
 .env
-frontend/frontend/
+.venv/
+venv/
+*.log
 .workbuddy/
+.DS_Store
 nul

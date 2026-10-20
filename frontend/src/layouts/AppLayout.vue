@@ -88,8 +88,8 @@ interface MenuItem {
   meta: { title: string; icon: string }
 }
 
-// 「首页」指向公开插件展示页（独立布局），所以不进 appRoutes，
-// 在这里固定放在菜单第一位，避免和后台页面的路由混在一起。
+// 「首页」指向公开插件展示页（独立布局），所以不进 appRoutes。
+// 放在菜单最后一项：日常操作都在后台页面，回首页是低频动作。
 const homeMenuItem: MenuItem = {
   path: '/',
   name: 'home',
@@ -97,7 +97,6 @@ const homeMenuItem: MenuItem = {
 }
 
 const menus = computed<MenuItem[]>(() => [
-  homeMenuItem,
   ...appRoutes
     .filter((item) => item.meta?.menu && (!item.meta.admin || auth.state.user?.role_code === 'admin'))
     .map((item) => ({
@@ -105,6 +104,7 @@ const menus = computed<MenuItem[]>(() => [
       name: String(item.name),
       meta: { title: String(item.meta?.title || ''), icon: String(item.meta?.icon || '') },
     })),
+  homeMenuItem,
 ])
 const pageTitle = computed(() => String(route.meta.title || '管理后台'))
 
@@ -129,10 +129,10 @@ system.loadPublic()
     <div v-if="mobileOpen" class="drawer-overlay" @click="mobileOpen = false" />
     <aside class="sidebar" :class="{ 'mobile-open': mobileOpen }">
       <div class="sidebar-brand">
-        <img src="/napcat-logo.png" alt="NapCat 插件中心" />
+        <img src="/napcat-logo.png" alt="PlugHub 插件库" />
         <div v-if="!collapsed" class="brand-copy">
-          <strong>NapCat 插件中心</strong>
-          <span>PLUGIN REGISTRY</span>
+          <strong>PlugHub 插件库</strong>
+          <span>PLUGHUB</span>
         </div>
         <button class="mobile-close icon-button" type="button" title="关闭导航" @click="mobileOpen = false">
           <X :size="19" />
