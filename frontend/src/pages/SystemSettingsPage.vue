@@ -152,10 +152,23 @@ async function savePluginSync() {
   toast.show(result.message, 'success')
 }
 
+/** 生成随机十六进制串；用 getRandomValues 而不是 randomUUID，
+ * 后者只在 HTTPS 或 localhost 下可用，用 IP 访问的部署会直接报错。 */
+function randomHex(bytes: number): string {
+  const buffer = new Uint8Array(bytes)
+  if (globalThis.crypto?.getRandomValues) {
+    globalThis.crypto.getRandomValues(buffer)
+  } else {
+    for (let index = 0; index < buffer.length; index += 1) {
+      buffer[index] = Math.floor(Math.random() * 256)
+    }
+  }
+  return Array.from(buffer, (byte) => byte.toString(16).padStart(2, '0')).join('')
+}
+
 /** 生成一个足够随机的接入令牌，省得用户自己想。 */
 function generateRegistryToken() {
-  const random = crypto.randomUUID().replace(/-/g, '')
-  registry.token = `reg_${random}${crypto.randomUUID().replace(/-/g, '').slice(0, 8)}`
+  registry.token = `reg_${randomHex(24)}`
 }
 
 async function saveRegistry() {
