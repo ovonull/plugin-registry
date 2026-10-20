@@ -209,3 +209,34 @@
 /* 「插件同步」页签：手动触发按钮与上次同步时间并排，窄屏自动换行 */
 .form-actions-inline { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .form-actions-inline .muted-text { font-size: 12px; }
+
+/* 接入令牌：保存后在这里显示一次明文，方便直接复制给下游 */
+.token-reveal {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--success) 35%, var(--border));
+  border-radius: 10px;
+  background: var(--success-soft);
+}
+
+.token-reveal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.token-reveal-head strong { font-size: 12px; color: var(--success); }
+
+.token-reveal code {
+  display: block;
+  padding: 8px 10px;
+  border-radius: 7px;
+  background: var(--surface);
+  font: 12px/1.6 'Cascadia Mono', Consolas, monospace;
+  word-break: break-all;
+  user-select: all;
+}
+
+.token-reveal small { color: var(--text-muted); font-size: 11px; }

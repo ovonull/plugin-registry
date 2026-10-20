@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
-import { Mail, Palette, Save, TextCursorInput, Github, RefreshCcw, KeyRound } from 'lucide-vue-next'
+import { Copy, Mail, Palette, Save, TextCursorInput, Github, RefreshCcw, KeyRound } from 'lucide-vue-next'
 import { pluginAdminApi, settingsApi } from '../api'
 import LoadingOverlay from '../components/common/LoadingOverlay.vue'
 import PasswordInput from '../components/common/PasswordInput.vue'
@@ -166,18 +166,53 @@ function randomHex(bytes: number): string {
   return Array.from(buffer, (byte) => byte.toString(16).padStart(2, '0')).join('')
 }
 
+/** 刚保存的令牌明文：后端只回显掩码，这里单独记一份给用户复制。 */
+const savedToken = ref('')
+
 /** 生成一个足够随机的接入令牌，省得用户自己想。 */
 function generateRegistryToken() {
+  savedToken.value = ''
   registry.token = `reg_${randomHex(24)}`
 }
 
+async function copySavedToken() {
+  const text = savedToken.value
+  if (!text) return
+  // clipboard API 需要安全上下文，http + IP 访问时会缺失，退回 execCommand。
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text)
+      toast.show('令牌已复制', 'success')
+      return
+    }
+  } catch {
+    /* 继续走下面的兜底 */
+  }
+  const area = document.createElement('textarea')
+  area.value = text
+  area.style.position = 'fixed'
+  area.style.opacity = '0'
+  document.body.appendChild(area)
+  area.select()
+  const copied = document.execCommand('copy')
+  document.body.removeChild(area)
+  toast.show(copied ? '令牌已复制' : '复制失败，请点眼睛图标后手动选中复制', copied ? 'success' : 'error')
+}
+
 async function saveRegistry() {
+  const token = registry.token.trim()
   saving.value = true
-  const result = await settingsApi.saveRegistry(registry)
+  const result = await settingsApi.saveRegistry({ token })
   saving.value = false
   if (!result.success) return toast.show(result.message, 'error')
-  Object.assign(registry, result.data)
-  toast.show(result.message, 'success')
+  if (token && token !== '******') {
+    // 不回填后端返回的掩码，否则刚生成的令牌当场就看不到了。
+    registry.token = token
+    savedToken.value = token
+    toast.show('已保存，请立即复制下面的令牌', 'success')
+  } else {
+    toast.show(result.message, 'success')
+  }
 }
 
 onMounted(() => loadGroup('email'))
@@ -237,8 +272,19 @@ onMounted(() => loadGroup('email'))
       <form class="settings-form" @submit.prevent="saveRegistry">
         <label>接入令牌
           <PasswordInput v-model="registry.token" placeholder="reg_..." />
-          <small>下游请求时带上 <code>Authorization: Bearer &lt;令牌&gt;</code> 或 <code>X-Registry-Token</code>。留空表示只有已登录账号能访问。</small>
+          <small v-if="registry.token === '******' && !savedToken">当前已配置令牌，输入框显示的是掩码；要更换请点「随机生成」后保存。</small>
+          <small v-else>下游请求时带上 <code>Authorization: Bearer &lt;令牌&gt;</code> 或 <code>X-Registry-Token</code>。留空表示只有已登录账号能访问。</small>
         </label>
+
+        <div v-if="savedToken" class="token-reveal">
+          <div class="token-reveal-head">
+            <strong>本次保存的令牌</strong>
+            <button type="button" class="button secondary small" @click="copySavedToken"><Copy :size="14" />复制</button>
+          </div>
+          <code>{{ savedToken }}</code>
+          <small>离开本页后不再显示原文；丢了就重新生成一个，旧令牌随之失效。</small>
+        </div>
+
         <div class="form-actions">
           <button type="button" class="button secondary" @click="generateRegistryToken">随机生成</button>
           <button class="button primary" type="submit" :disabled="saving"><span v-if="saving" class="button-spinner" /><Save :size="16" />保存令牌</button>
