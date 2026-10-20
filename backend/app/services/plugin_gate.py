@@ -29,7 +29,7 @@ DOMAIN_PATTERN = re.compile(
     r"^(\*\.)?([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,24}$"
 )
 
-MAX_DOMAIN_COUNT = 20
+MAX_DOMAIN_COUNT = 50
 
 
 def validate_allowed_domains(payload: dict[str, Any], declared: list[str]) -> list[str]:
@@ -68,7 +68,8 @@ def validate_allowed_domains(payload: dict[str, Any], declared: list[str]) -> li
         domains.append(domain)
     if len(domains) > MAX_DOMAIN_COUNT:
         raise BusinessError(
-            f"出网域名白名单最多 {MAX_DOMAIN_COUNT} 条，当前 {len(domains)} 条",
+            f"出网域名白名单最多 {MAX_DOMAIN_COUNT} 条，当前 {len(domains)} 条；"
+            "同一主域下的子域可写成通配形式（例如 *.douyin.com）来合并",
             CODE_DOMAIN_INVALID,
         )
     if OUTBOUND_CAPABILITY in declared and not domains:
