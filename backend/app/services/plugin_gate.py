@@ -29,7 +29,9 @@ DOMAIN_PATTERN = re.compile(
     r"^(\*\.)?([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,24}$"
 )
 
-MAX_DOMAIN_COUNT = 50
+# 插件库只登记与分发、不执行插件，域名条数不构成运行风险，这里只做防呆，
+# 避免清单异常膨胀；正常跨平台插件几十条属正常量级。
+MAX_DOMAIN_COUNT = 200
 
 
 def validate_allowed_domains(payload: dict[str, Any], declared: list[str]) -> list[str]:

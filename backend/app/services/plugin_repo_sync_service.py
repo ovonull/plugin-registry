@@ -196,6 +196,9 @@ class PluginRepoSyncService:
                 stats["up_to_date"],
                 len(stats["failed"]),
             )
+        # 失败原因逐条落到日志：否则只看到「失败=1」，要排查还得去翻接口内存态。
+        for reason in stats["failed"]:
+            logger.warning("插件仓库自动同步失败：%s", reason)
         return stats
 
     def last_result(self) -> dict[str, Any]:
