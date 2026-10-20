@@ -108,7 +108,11 @@ class RegistryExportService:
             "source_ref": version.source_ref or "",
             "package_url": package_url,
             "checksum": version.checksum or "",
-            "capabilities": manifest.get("capabilities") or [],
+            # 下发审核通过的能力，而不是作者申请值：下游会按这个字段授权，
+            # 用申请值等于绕过审核。早期没有授权记录的版本才退回申请值。
+            "capabilities": self._parse_list(version.granted_capabilities_json)
+            if version.granted_capabilities_json
+            else self._parse_list(version.capabilities_json),
             "min_host_version": version.min_host_version or "",
             "max_host_version": version.max_host_version or "",
             "changelog": str(manifest.get("changelog") or ""),
@@ -145,11 +149,13 @@ class RegistryExportService:
                 "icon_url": plugin.icon_path or "",
                 "author_url": author_url,
                 "license": plugin.license or "",
-                # 公开页面只暴露已批准的能力，未批准的能力不对外展示。
+                # 公开页面只暴露已批准的能力；审核记录存在但批了 0 项时保持为空，
+                # 不能用 `or` 回退成申请值，否则会把没批的能力也暴露出去。
                 "capabilities": self._parse_list(
                     version.granted_capabilities_json
                 )
-                or self._parse_list(version.capabilities_json),
+                if version.granted_capabilities_json
+                else self._parse_list(version.capabilities_json),
                 "install_count": install_count,
                 "created_at": self._iso(plugin.created_at),
                 "updated_at": self._iso(plugin.updated_at),
