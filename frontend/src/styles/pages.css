@@ -240,3 +240,74 @@
 }
 
 .token-reveal small { color: var(--text-muted); font-size: 11px; }
+
+/* 接入令牌列表：参照常见控制台的 Key 表格，只展示前缀与时间 */
+.token-table {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.token-table-head,
+.token-table-row {
+  display: grid;
+  grid-template-columns: minmax(110px, 1.1fr) minmax(130px, 1.3fr) minmax(130px, 1fr) minmax(130px, 1fr) 40px;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 14px;
+  font-size: 12px;
+}
+
+.token-table-head {
+  background: var(--surface-muted);
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.token-table-row { border-top: 1px solid var(--border); }
+
+.token-table-row code {
+  color: var(--text);
+  font: 12px/1.5 'Cascadia Mono', Consolas, monospace;
+}
+
+.token-name {
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.token-idle { color: var(--text-subtle); }
+
+.token-revoke {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  place-items: center;
+}
+
+.token-revoke:hover {
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  color: var(--danger);
+}
+
+.token-empty {
+  padding: 22px 14px;
+  color: var(--text-muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+@media (max-width: 760px) {
+  .token-table-head { display: none; }
+  .token-table-row { grid-template-columns: 1fr auto; row-gap: 6px; }
+  .token-table-row > span:nth-child(3),
+  .token-table-row > span:nth-child(4) { color: var(--text-muted); font-size: 11px; }
+  .token-table-row > code { grid-column: 1 / -1; }
+}

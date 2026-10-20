@@ -200,6 +200,15 @@ class RegistrySettingsRequest(BaseModel):
     token: str = Field(default="", max_length=128)
 
 
+class RegistryTokenCreateRequest(BaseModel):
+    """新建接入令牌参数。"""
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    # 用途标注，例如「NapCatQQ Service 生产」，方便区分是谁在用。
+    name: str = Field(default="", max_length=100)
+
+
 class AutoReplyCreateRequest(BaseModel):
     """自动回复规则新增参数。"""
 

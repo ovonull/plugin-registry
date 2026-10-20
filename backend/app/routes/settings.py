@@ -14,7 +14,9 @@ from app.schemas import (
     IntroductionSettingsRequest,
     PluginSyncSettingsRequest,
     RegistrySettingsRequest,
+    RegistryTokenCreateRequest,
 )
+from app.services.registry_token_service import RegistryTokenService, mask_prefix
 from app.services.setting_service import SettingService
 
 
@@ -146,3 +148,52 @@ async def save_animated_emoji(
         "animated_emoji", payload.model_dump()
     )
     return success(data, "动画表情分类提示词已保存")
+
+
+def _registry_token_item(row) -> dict:
+    """列表展示用：只给前缀与时间，永远不返回明文。"""
+    return {
+        "id": row.id,
+        "name": row.name,
+        "prefix": mask_prefix(row.token_prefix),
+        "created_at": row.created_at.isoformat() if row.created_at else "",
+        "last_used_at": row.last_used_at.isoformat() if row.last_used_at else "",
+    }
+
+
+@router.get("/registry/tokens")
+async def list_registry_tokens(
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """列出当前有效的接入令牌（只含前缀，不含明文）。"""
+    await _require_admin(request, session)
+    rows = await RegistryTokenService().list_tokens(session)
+    return success({"items": [_registry_token_item(row) for row in rows]})
+
+
+@router.post("/registry/tokens")
+async def create_registry_token(
+    payload: RegistryTokenCreateRequest,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """新建一枚接入令牌，明文只在这次响应里返回。"""
+    await _require_admin(request, session)
+    row, plain = await RegistryTokenService().create(session, payload.name)
+    return success(
+        {"token": plain, "item": _registry_token_item(row)},
+        "令牌已创建，请立即复制",
+    )
+
+
+@router.delete("/registry/tokens/{token_id}")
+async def revoke_registry_token(
+    token_id: int,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """吊销一枚接入令牌，立即失效。"""
+    await _require_admin(request, session)
+    await RegistryTokenService().revoke(session, token_id)
+    return success({"id": token_id}, "令牌已吊销")

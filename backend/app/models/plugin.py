@@ -199,3 +199,26 @@ class PluginActionLog(Base, IntegerPrimaryKeyMixin, TimestampMixin):
     result_code: Mapped[str] = mapped_column(String(20), nullable=False, default="")
     result_message: Mapped[str] = mapped_column(Text, nullable=False, default="")
     duration_ms: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+
+class RegistryToken(Base, IntegerPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin):
+    """插件库分发接口的接入令牌。
+
+    只保存摘要与前缀：明文仅创建时返回一次，之后无法再读取，
+    与「单条 settings 加密保存」相比更适合发给多个下游并逐个吊销。
+    """
+
+    __tablename__ = "registry_tokens"
+    __table_args__ = (
+        UniqueConstraint("token_hash", name="uq_registry_token_hash"),
+        Index("ix_registry_token_active", "is_deleted"),
+    )
+
+    # 用途标注，例如「NapCatQQ Service 生产」，方便区分是谁在用。
+    name: Mapped[str] = mapped_column(String(100), nullable=False, default="")
+    # sha256 摘要，用于等值比对；不存明文。
+    token_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    # 明文前缀（reg_ 加前 8 位），仅用于列表展示与人工核对。
+    token_prefix: Mapped[str] = mapped_column(String(24), nullable=False, default="")
+    # 最近一次通过鉴权的时间，用于判断某个下游是否还在用。
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

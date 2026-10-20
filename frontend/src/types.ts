@@ -149,6 +149,15 @@ export interface RegistrySettings {
   token: string
 }
 
+/** 一枚接入令牌的展示信息，明文只在创建时返回。 */
+export interface RegistryTokenItem {
+  id: number
+  name: string
+  prefix: string
+  created_at: string
+  last_used_at: string
+}
+
 export interface AutoReplyRule {
   id: number
   owner_id: number

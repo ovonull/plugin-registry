@@ -71,6 +71,7 @@ import type {
   PluginSyncSettings,
   RegistryPlugin,
   RegistrySettings,
+  RegistryTokenItem,
   RegistryStats,
 } from '../types'
 
@@ -169,6 +170,16 @@ export const settingsApi = {
     request<PluginSyncSettings>({ url: '/settings/plugin-sync/save', method: 'PUT', data: payload }),
   saveRegistry: (payload: RegistrySettings) =>
     request<RegistrySettings>({ url: '/settings/registry/save', method: 'PUT', data: payload }),
+  listRegistryTokens: () =>
+    request<{ items: RegistryTokenItem[] }>({ url: '/settings/registry/tokens' }),
+  createRegistryToken: (payload: { name: string }) =>
+    request<{ token: string; item: RegistryTokenItem }>({
+      url: '/settings/registry/tokens',
+      method: 'POST',
+      data: payload,
+    }),
+  revokeRegistryToken: (id: number) =>
+    request<{ id: number }>({ url: `/settings/registry/tokens/${id}`, method: 'DELETE' }),
 }
 
 export interface RuleQuery {

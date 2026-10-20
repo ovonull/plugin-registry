@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.common.responses import BusinessError
 from app.common.security import secure_equals
 from app.models.entities import User
+from app.services.registry_token_service import RegistryTokenService
 
 
 async def get_session(request: Request) -> AsyncIterator[AsyncSession]:
@@ -71,7 +72,11 @@ async def require_registry_access(
         request.headers.get("x-registry-token", "")
     ).strip()
     expected = getattr(request.app.state.container.settings, "registry_token", "")
+    # 方式一：.env 里配置的单枚令牌（部署时用环境变量注入的兼容通道）。
     if expected and supplied and secure_equals(supplied, expected):
+        return "service"
+    # 方式二：后台「接入令牌」页签创建的令牌，支持多条与单独吊销。
+    if supplied and await RegistryTokenService().verify(session, supplied):
         return "service"
     try:
         await request.app.state.container.user_service.get_current_user(

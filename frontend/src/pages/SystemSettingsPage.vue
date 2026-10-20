@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
-import { Copy, Mail, Palette, Save, TextCursorInput, Github, RefreshCcw, KeyRound } from 'lucide-vue-next'
+import { Copy, Mail, Palette, Save, TextCursorInput, Github, Plus, RefreshCcw, KeyRound, Trash2 } from 'lucide-vue-next'
 import { pluginAdminApi, settingsApi } from '../api'
+import BaseModal from '../components/common/BaseModal.vue'
 import LoadingOverlay from '../components/common/LoadingOverlay.vue'
 import PasswordInput from '../components/common/PasswordInput.vue'
 import { useSystemSettings } from '../composables/useSystemSettings'
@@ -13,7 +14,7 @@ import type {
   GithubSettings,
   IntroductionSettings,
   PluginSyncSettings,
-  RegistrySettings,
+  RegistryTokenItem,
 } from '../types'
 
 type Tab = 'email' | 'appearance' | 'introduction' | 'github' | 'plugin_sync' | 'registry'
@@ -31,7 +32,6 @@ const appearance = reactive<AppearanceSettings>({ color: 'ocean', font: 'system'
 const introduction = reactive<IntroductionSettings>({ name: 'PlugHub 插件库', description: 'PlugHub 插件分发与审核平台' })
 const github = reactive<GithubSettings>({ plugin_repo_token: '' })
 const pluginSync = reactive<PluginSyncSettings>({ enabled: true, interval_seconds: 21600, batch: 20 })
-const registry = reactive<RegistrySettings>({ token: '' })
 
 // 界面上按分钟编辑更直观：后端硬下限是 300 秒，落库仍存秒。
 const intervalMinutes = computed({
@@ -94,7 +94,7 @@ async function loadGroup(group: Tab) {
     Object.assign(pluginSync, result.data)
     loadSyncStatus()
   }
-  if (group === 'registry') Object.assign(registry, result.data)
+  if (group === 'registry') loadTokens()
   loaded[group] = true
 }
 
@@ -152,37 +152,13 @@ async function savePluginSync() {
   toast.show(result.message, 'success')
 }
 
-/** 生成随机十六进制串；用 getRandomValues 而不是 randomUUID，
- * 后者只在 HTTPS 或 localhost 下可用，用 IP 访问的部署会直接报错。 */
-function randomHex(bytes: number): string {
-  const buffer = new Uint8Array(bytes)
-  if (globalThis.crypto?.getRandomValues) {
-    globalThis.crypto.getRandomValues(buffer)
-  } else {
-    for (let index = 0; index < buffer.length; index += 1) {
-      buffer[index] = Math.floor(Math.random() * 256)
-    }
-  }
-  return Array.from(buffer, (byte) => byte.toString(16).padStart(2, '0')).join('')
-}
-
-/** 刚保存的令牌明文：后端只回显掩码，这里单独记一份给用户复制。 */
-const savedToken = ref('')
-
-/** 生成一个足够随机的接入令牌，省得用户自己想。 */
-function generateRegistryToken() {
-  savedToken.value = ''
-  registry.token = `reg_${randomHex(24)}`
-}
-
-async function copySavedToken() {
-  const text = savedToken.value
+/** 复制文本；clipboard API 需要安全上下文，http + IP 访问时退回 execCommand。 */
+async function copyText(text: string, successText = '已复制'): Promise<void> {
   if (!text) return
-  // clipboard API 需要安全上下文，http + IP 访问时会缺失，退回 execCommand。
   try {
     if (navigator.clipboard?.writeText) {
       await navigator.clipboard.writeText(text)
-      toast.show('令牌已复制', 'success')
+      toast.show(successText, 'success')
       return
     }
   } catch {
@@ -196,23 +172,54 @@ async function copySavedToken() {
   area.select()
   const copied = document.execCommand('copy')
   document.body.removeChild(area)
-  toast.show(copied ? '令牌已复制' : '复制失败，请点眼睛图标后手动选中复制', copied ? 'success' : 'error')
+  toast.show(copied ? successText : '复制失败，请手动选中复制', copied ? 'success' : 'error')
 }
 
-async function saveRegistry() {
-  const token = registry.token.trim()
-  saving.value = true
-  const result = await settingsApi.saveRegistry({ token })
-  saving.value = false
+// ---------------------------------------------------------------- 接入令牌
+
+const tokens = ref<RegistryTokenItem[]>([])
+const tokensLoading = ref(false)
+const createOpen = ref(false)
+const createName = ref('')
+const creating = ref(false)
+/** 刚创建出来的明文令牌，只在这个弹窗里显示一次。 */
+const createdToken = ref('')
+
+function formatTokenTime(value: string): string {
+  if (!value) return '—'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '—'
+  return date.toLocaleString('zh-CN', { hour12: false })
+}
+
+async function loadTokens() {
+  tokensLoading.value = true
+  const result = await settingsApi.listRegistryTokens()
+  tokensLoading.value = false
   if (!result.success) return toast.show(result.message, 'error')
-  if (token && token !== '******') {
-    // 不回填后端返回的掩码，否则刚生成的令牌当场就看不到了。
-    registry.token = token
-    savedToken.value = token
-    toast.show('已保存，请立即复制下面的令牌', 'success')
-  } else {
-    toast.show(result.message, 'success')
-  }
+  tokens.value = result.data?.items || []
+}
+
+function openCreateToken() {
+  createName.value = ''
+  createdToken.value = ''
+  createOpen.value = true
+}
+
+async function createToken() {
+  creating.value = true
+  const result = await settingsApi.createRegistryToken({ name: createName.value.trim() })
+  creating.value = false
+  if (!result.success) return toast.show(result.message, 'error')
+  createdToken.value = result.data?.token || ''
+  await loadTokens()
+}
+
+async function revokeToken(item: RegistryTokenItem) {
+  const result = await settingsApi.revokeRegistryToken(item.id)
+  if (!result.success) return toast.show(result.message, 'error')
+  toast.show(result.message, 'success')
+  await loadTokens()
 }
 
 onMounted(() => loadGroup('email'))
@@ -268,32 +275,33 @@ onMounted(() => loadGroup('email'))
     </section>
 
     <section v-else-if="activeTab === 'registry'" class="content-panel settings-module">
-      <div class="panel-heading"><div><h2><KeyRound :size="18" />插件库接入令牌</h2><p>索引、插件列表与插件包下载都需要鉴权，下游插件市场靠这枚令牌访问。</p></div></div>
-      <form class="settings-form" @submit.prevent="saveRegistry">
-        <label>接入令牌
-          <PasswordInput v-model="registry.token" placeholder="reg_..." />
-          <small v-if="registry.token === '******' && !savedToken">当前已配置令牌，输入框显示的是掩码；要更换请点「随机生成」后保存。</small>
-          <small v-else>下游请求时带上 <code>Authorization: Bearer &lt;令牌&gt;</code> 或 <code>X-Registry-Token</code>。留空表示只有已登录账号能访问。</small>
-        </label>
+      <div class="panel-heading">
+        <div><h2><KeyRound :size="18" />插件库接入令牌</h2><p>索引、插件列表与插件包下载都需要鉴权，下游程序靠这里的令牌访问。</p></div>
+        <button type="button" class="button primary" @click="openCreateToken"><Plus :size="16" />创建令牌</button>
+      </div>
 
-        <div v-if="savedToken" class="token-reveal">
-          <div class="token-reveal-head">
-            <strong>本次保存的令牌</strong>
-            <button type="button" class="button secondary small" @click="copySavedToken"><Copy :size="14" />复制</button>
-          </div>
-          <code>{{ savedToken }}</code>
-          <small>离开本页后不再显示原文；丢了就重新生成一个，旧令牌随之失效。</small>
+      <div class="token-table">
+        <div class="token-table-head">
+          <span>名称</span><span>Key</span><span>创建时间</span><span>最后使用</span><span>操作</span>
         </div>
+        <div v-for="item in tokens" :key="item.id" class="token-table-row">
+          <span class="token-name">{{ item.name || '未命名令牌' }}</span>
+          <code>{{ item.prefix }}</code>
+          <span>{{ formatTokenTime(item.created_at) }}</span>
+          <span :class="{ 'token-idle': !item.last_used_at }">{{ item.last_used_at ? formatTokenTime(item.last_used_at) : '从未使用' }}</span>
+          <button type="button" class="token-revoke" title="吊销令牌" @click="revokeToken(item)">
+            <Trash2 :size="15" />
+          </button>
+        </div>
+        <p v-if="tokensLoading" class="token-empty">加载中…</p>
+        <p v-else-if="!tokens.length" class="token-empty">还没有令牌，点右上角创建一枚发给下游程序。</p>
+      </div>
 
-        <div class="form-actions">
-          <button type="button" class="button secondary" @click="generateRegistryToken">随机生成</button>
-          <button class="button primary" type="submit" :disabled="saving"><span v-if="saving" class="button-spinner" /><Save :size="16" />保存令牌</button>
-        </div>
-        <p class="form-hint">
-          已登录用户访问首页时走账号会话，不受这里影响；这枚令牌用于给下游插件市场这类程序放行。
-          令牌以加密形式存库，读取时只显示掩码；保存后立即生效，无需重启。
-        </p>
-      </form>
+      <p class="form-hint">
+        明文只在创建时显示一次，库里只保存摘要，之后无法再查看；泄露了就吊销重新创建。
+        请求时带上 <code>Authorization: Bearer &lt;令牌&gt;</code> 或 <code>X-Registry-Token</code>。
+        已登录用户访问首页走账号会话，不消耗令牌。
+      </p>
       <LoadingOverlay :visible="loading" contained />
     </section>
 
@@ -315,5 +323,30 @@ onMounted(() => loadGroup('email'))
       </form>
       <LoadingOverlay :visible="loading" contained />
     </section>
+
+    <BaseModal :open="createOpen" title="创建接入令牌" @close="createOpen = false">
+      <div v-if="!createdToken" class="modal-form">
+        <label class="field-label">用途标注
+          <input v-model="createName" maxlength="100" placeholder="例如：NapCatQQ Service 生产" />
+        </label>
+        <p class="form-hint">标注只用于区分是谁在用，方便以后单独吊销。</p>
+        <div class="modal-form-actions">
+          <button type="button" class="button secondary" @click="createOpen = false">取消</button>
+          <button type="button" class="button primary" :disabled="creating" @click="createToken">
+            <span v-if="creating" class="button-spinner" />创建
+          </button>
+        </div>
+      </div>
+      <div v-else class="modal-form">
+        <p class="form-hint">这枚令牌只显示这一次，请立刻复制保存。</p>
+        <div class="token-reveal">
+          <code>{{ createdToken }}</code>
+        </div>
+        <div class="modal-form-actions">
+          <button type="button" class="button secondary" @click="copyText(createdToken, '令牌已复制')"><Copy :size="15" />复制</button>
+          <button type="button" class="button primary" @click="createOpen = false">我已保存</button>
+        </div>
+      </div>
+    </BaseModal>
   </div>
 </template>
