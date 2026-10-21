@@ -15,6 +15,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import time
 from typing import Any
 
@@ -61,6 +62,16 @@ def _text_config(host: Any, key: str, default: str) -> str:
 def _choice(host: Any, key: str, default: str) -> str:
     """读取下拉型配置，空值按默认项处理。"""
     return _text_config(host, key, default)
+
+
+def _switch(host: Any, key: str, default: bool = False) -> bool:
+    """读取开关型配置，兼容布尔与字符串两种落库形式。"""
+    value = host.config.get(key)
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    return str(value).strip().lower() in {"1", "true", "yes", "on", "是"}
 
 
 def _int_config(
@@ -303,6 +314,70 @@ async def _dispatch_parse(
     raise VideoParseError("暂不支持这个平台", "目前支持抖音、B 站与小红书")
 
 
+# AI 评价：视频发出后再补一条，走宿主代调的模型能力。
+DEFAULT_SUMMARY_PROMPT = (
+    "用一两句话点评刚才这个视频：说清它讲什么、适合谁看，最后给一个 1-10 分的评分。"
+    "不要复述标题，不要用列表，不超过 60 字。"
+)
+MAX_SUMMARY_PROMPT = 500
+MAX_SUMMARY_LENGTH = 300
+# 后台任务集合，持有引用防止任务被回收后提前取消。
+_summary_tasks: set[asyncio.Task] = set()
+
+
+def _build_summary_prompt(host: Any, media: dict[str, Any]) -> str:
+    """拼评价用的提示词：把解析到的元信息一起给模型，避免它凭空猜。"""
+    style = _text_config(host, "ai_summary_prompt", DEFAULT_SUMMARY_PROMPT)
+    lines = [str(style)[:MAX_SUMMARY_PROMPT], "", "视频信息："]
+    title = common.flatten(media.get("title"))
+    if title:
+        lines.append(f"标题：{common.clip(title, MAX_TITLE_LENGTH)}")
+    if media.get("author"):
+        lines.append(f"作者：{media['author']}")
+    if media.get("platform_name"):
+        lines.append(f"平台：{media['platform_name']}")
+    duration = common.format_duration(media.get("duration"))
+    if duration:
+        lines.append(f"时长：{duration}")
+    stats = [str(item) for item in media.get("stats") or [] if item]
+    if stats:
+        lines.append(f"互动数据：{' · '.join(stats)}")
+    desc = common.block(media.get("desc"), MAX_DESC_LENGTH)
+    if desc:
+        lines.append(f"简介：{desc}")
+    return "\n".join(lines)
+
+
+async def _send_ai_summary(host: Any, event: dict[str, Any], media: dict[str, Any]) -> None:
+    """调用机器人 AI 生成一句评价并发出去，失败只记日志。"""
+    try:
+        text = await host.llm_generate(_build_summary_prompt(host, media))
+    except PluginCallError as error:
+        host.log(f"AI 评价失败：{error}", "warning")
+        return
+    except Exception as error:  # 插件内部兜底，不影响已经发出去的视频
+        host.log(f"AI 评价异常：{type(error).__name__}: {error}", "warning")
+        return
+    text = str(text or "").strip()
+    if not text:
+        return
+    if len(text) > MAX_SUMMARY_LENGTH:
+        text = text[:MAX_SUMMARY_LENGTH] + "…"
+    await _safe_reply(host, event, text, "发送 AI 评价")
+
+
+def _schedule_ai_summary(host: Any, event: dict[str, Any], media: dict[str, Any]) -> None:
+    """把评价丢到后台：模型生成要十几秒，留在 handler 里会超过 10 秒被宿主杀掉。"""
+    if not _switch(host, "ai_summary_enabled"):
+        return
+    if not host.has("llm.generate"):
+        host.log("未获批「调用机器人 AI」能力，跳过 AI 评价", "warning")
+        return
+    task = asyncio.create_task(_send_ai_summary(host, event, media))
+    _summary_tasks.add(task)
+    task.add_done_callback(_summary_tasks.discard)
+
+
 @on_message
 async def handle_video(event: dict[str, Any], host: Any) -> None:
     """收到消息时判断是否包含可解析的视频链接，命中则回视频或链接。"""
@@ -420,3 +495,6 @@ async def handle_video(event: dict[str, Any], host: Any) -> None:
         await _safe_reply(host, event, fallback, "补发直链")
     except PluginCallError as error:
         host.log(f"发送消息失败：{error}", "error")
+    finally:
+        # 无论走哪条分支，媒体都已经发过（或是被拒后补了直链），此时再补一句 AI 评价。
+        _schedule_ai_summary(host, event, media)
