@@ -7,6 +7,8 @@ data/
 .env
 .venv/
 venv/
+.idea/
+*.iml
 *.log
 .workbuddy/
 .DS_Store
