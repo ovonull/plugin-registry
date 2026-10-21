@@ -11,3 +11,6 @@ venv/
 .workbuddy/
 .DS_Store
 nul
+
+# 插件源码不随主仓库分发，单独维护/打包上传
+plugins/
