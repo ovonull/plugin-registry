@@ -12,14 +12,17 @@
 from dataclasses import dataclass
 from datetime import datetime, timezone
 import json
+import logging
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.common.config import Settings
-from app.models.plugin import Plugin, PluginInstallation, PluginVersion
+from app.models.plugin import Plugin, PluginVersion
+
+logger = logging.getLogger(__name__)
 
 
 SCHEMA_VERSION = 1
@@ -88,6 +91,7 @@ class RegistryExportService:
         plugin: Plugin,
         version: PluginVersion,
         package_url: str = "",
+        install_count: int = 0,
     ) -> dict[str, Any]:
         """把插件与当前版本转换为索引条目。"""
         manifest = self._parse_manifest(version.manifest_json)
@@ -117,6 +121,8 @@ class RegistryExportService:
             "max_host_version": version.max_host_version or "",
             "changelog": str(manifest.get("changelog") or ""),
             "published_at": published_at,
+            # 下游市场卡片展示的安装量，来自插件包下载次数。
+            "install_count": int(install_count or 0),
         }
 
     @staticmethod
@@ -164,13 +170,36 @@ class RegistryExportService:
         return base
 
     async def _install_counts(self, session: AsyncSession) -> dict[str, int]:
-        """按插件统计安装份数，作为首页热度的唯一来源。"""
+        """按插件统计安装量，作为首页热度与索引 install_count 的唯一来源。
+
+        插件库本身不安装插件，本地的 plugin_installations 永远是空的，
+        因此这里以下游实际下载插件包的次数为准；老数据补列后为 NULL，
+        一并按 0 返回。
+        """
         result = await session.execute(
-            select(PluginInstallation.plugin_id, func.count(PluginInstallation.id))
-            .where(PluginInstallation.is_deleted.is_(False))
-            .group_by(PluginInstallation.plugin_id)
+            select(Plugin.plugin_id, Plugin.download_count).where(
+                Plugin.is_deleted.is_(False)
+            )
         )
-        return {str(plugin_id): int(count) for plugin_id, count in result.all()}
+        return {
+            str(plugin_id): int(count or 0) for plugin_id, count in result.all()
+        }
+
+    async def record_download(self, session: AsyncSession, plugin_id: str) -> None:
+        """插件包下载成功后累加一次安装计数，失败只记日志不影响下载。"""
+        try:
+            await session.execute(
+                update(Plugin)
+                .where(
+                    Plugin.plugin_id == plugin_id,
+                    Plugin.is_deleted.is_(False),
+                )
+                .values(download_count=func.coalesce(Plugin.download_count, 0) + 1)
+            )
+            await session.commit()
+        except Exception as exc:  # 计数失败不能让下游装不上插件
+            await session.rollback()
+            logger.warning("插件下载计数失败，插件=%s：%s", plugin_id, exc)
 
     async def _published_pairs(
         self, session: AsyncSession
@@ -200,11 +229,13 @@ class RegistryExportService:
     ) -> dict[str, Any]:
         """生成完整的公开索引数据，包地址按配置拼成绝对或相对路径。"""
         pairs = await self._published_pairs(session)
+        counts = await self._install_counts(session)
         entries = [
             self._version_payload(
                 plugin,
                 version,
                 self.package_url_of(plugin.plugin_id, version.version, settings),
+                counts.get(plugin.plugin_id, 0),
             )
             for plugin, version in pairs
         ]

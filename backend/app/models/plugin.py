@@ -54,6 +54,9 @@ class Plugin(Base, IntegerPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin):
     current_version_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     # 管理员上架总闸，默认关闭，只有上架后的插件才能被安装启用。
     is_published: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # 插件包被下游下载的次数。插件库自身不安装插件，只能以下载量反映热度；
+    # 老数据补列后为 NULL，读取时统一按 0 处理。
+    download_count: Mapped[int | None] = mapped_column(Integer, nullable=True, default=0)
 
 
 class PluginVersion(Base, IntegerPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin):

@@ -62,6 +62,8 @@ async def registry_package(
     )
     if content is None:
         raise HTTPException(status_code=404, detail="插件包不存在或已下架")
+    # 下载成功即视为一次安装，用于市场卡片的安装量展示。
+    await service.record_download(session, plugin_id)
     return Response(
         content=content,
         media_type="application/zip",
