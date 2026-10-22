@@ -41,6 +41,8 @@ backend/
 frontend/
   src/pages/         页面（首页、插件市场、我的插件、审核台、系统设置）
   src/styles/        全局样式与页面样式
+.github/workflows/
+  build-images.yml   构建并推送 Docker 镜像（GitHub Actions）
 deploy/linux/
   start.sh           裸机一键启动
   stop.sh            裸机停止
@@ -94,6 +96,38 @@ docker compose --profile mysql up -d --build
 ```
 
 并把 `.env` 的 `DATABASE_URL` 换成 `mysql+aiomysql://...`。
+
+---
+
+## 用预构建镜像部署（GitHub Actions 构建）
+
+服务器网络慢、`docker compose up -d --build` 卡在 pip / npm 下载时，改用现成镜像。仓库内置流水线 `.github/workflows/build-images.yml`，在 GitHub 的机器上把两个镜像编好推进镜像库，服务器只负责 `pull`。
+
+镜像名已经写死在 `docker-compose.yml` 的 `image:` 行里，**不用去 `.env` 里配**：
+
+```text
+ghcr.io/ovonull/pluginhub-backend:latest
+ghcr.io/ovonull/pluginhub-frontend:latest
+```
+
+**首次使用要做一次**：打开 `https://github.com/users/ovonull?tab=packages` → 点进 `pluginhub-backend` → 右侧 *Package settings* → Danger Zone → *Change visibility* → Public，`pluginhub-frontend` 同样操作。不做这一步服务器拉取会报 `unauthorized`。（不想公开就改成 `docker login ghcr.io`，用带 `read:packages` 的 PAT 登录。）
+
+服务器上只要两条：
+
+```bash
+docker compose pull
+docker compose up -d
+```
+
+注意**不要带 `--build`**，否则又会在本地编译一遍。
+
+如果 `docker compose up -d` 突然开始编译，说明镜像没拉到（多半是 GHCR 那个包还是私有的）。这时用 `docker compose up -d --no-build`，它会直接报错而不是偷偷跑一次慢编译。
+
+**日常更新**：代码推到 main → 等流水线变绿 → 服务器 `docker compose pull && docker compose up -d`。要回滚就在 `.env` 里把 `IMAGE_TAG` 改成某个 `sha-xxxxxxx`。
+
+**发版本**：`git tag v1.2.0 && git push origin v1.2.0` → 额外产出 `v1.2.0` / `v1.2` / `v1` 三个标签，`latest` 不受影响。
+
+**国内服务器拉不动 ghcr.io**：在仓库 *Settings → Secrets and variables → Actions* 里加四个 Secret —— `ACR_REGISTRY`（如 `registry.cn-hangzhou.aliyuncs.com`）、`ACR_NAMESPACE`、`ACR_USERNAME`、`ACR_PASSWORD`（阿里云容器镜像服务个人版免费），流水线会同时推到 ACR；再在 `.env` 里覆盖 `BACKEND_IMAGE` / `FRONTEND_IMAGE` 指向 ACR 地址即可。
 
 ---
 

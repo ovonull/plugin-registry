@@ -2,7 +2,7 @@ name: pluginhub
 
 services:
   backend:
-    image: ${BACKEND_IMAGE:-pluginhub-backend}:${IMAGE_TAG:-latest}
+    image: ${BACKEND_IMAGE:-ghcr.io/ovonull/pluginhub-backend}:${IMAGE_TAG:-latest}
     build:
       context: .
       dockerfile: backend/Dockerfile
@@ -60,7 +60,7 @@ services:
       - pluginhub-network
 
   frontend:
-    image: ${FRONTEND_IMAGE:-pluginhub-frontend}:${IMAGE_TAG:-latest}
+    image: ${FRONTEND_IMAGE:-ghcr.io/ovonull/pluginhub-frontend}:${IMAGE_TAG:-latest}
     build:
       context: .
       dockerfile: frontend/Dockerfile

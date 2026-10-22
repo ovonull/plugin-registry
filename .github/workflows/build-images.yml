@@ -1,0 +1,145 @@
+name: 构建镜像
+
+# 触发时机：
+#   1. 推送到 main                → 打 latest + sha-xxxxxxx
+#   2. 打 v* 标签（如 v1.2.0）     → 打 v1.2.0 + v1.2 + v1 + sha-xxxxxxx
+#   3. 手动运行（可填自定义标签）
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "自定义镜像标签（留空则打 latest）"
+        required: false
+        default: ""
+
+concurrency:
+  group: build-images-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  image:
+    name: ${{ matrix.image }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: pluginhub-backend
+            dockerfile: backend/Dockerfile
+          - image: pluginhub-frontend
+            dockerfile: frontend/Dockerfile
+    env:
+      # 【可选】国内服务器从 ghcr.io 拉取往往很慢，可以让流水线同时推到阿里云 ACR
+      # （容器镜像服务个人版免费）。在仓库 Settings → Secrets and variables → Actions
+      # 里加这四个 Secret 就会自动生效，不加则只推 ghcr.io：
+      #   ACR_REGISTRY   registry.cn-hangzhou.aliyuncs.com
+      #   ACR_NAMESPACE  你的命名空间（ACR 个人版里创建的）
+      #   ACR_USERNAME   阿里云账号全名
+      #   ACR_PASSWORD   ACR 的固定密码
+      ACR_REGISTRY: ${{ secrets.ACR_REGISTRY }}
+      ACR_NAMESPACE: ${{ secrets.ACR_NAMESPACE }}
+      ACR_USERNAME: ${{ secrets.ACR_USERNAME }}
+      ACR_PASSWORD: ${{ secrets.ACR_PASSWORD }}
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 计算镜像标签
+        id: meta
+        env:
+          IMAGE_NAME: ${{ matrix.image }}
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          short="sha-${GITHUB_SHA::7}"
+
+          # 要推送的镜像名前缀
+          prefixes=("ghcr.io/${owner}/${IMAGE_NAME}")
+          if [ -n "${ACR_REGISTRY:-}" ] && [ -n "${ACR_NAMESPACE:-}" ]; then
+            prefixes+=("${ACR_REGISTRY}/${ACR_NAMESPACE}/${IMAGE_NAME}")
+          fi
+
+          # 版本类标签
+          versions=()
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            v="${GITHUB_REF#refs/tags/}"
+            versions+=("${v}")
+            # v1.2.3 → 额外打 v1.2 与 v1，方便固定大版本
+            if [[ "${v}" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+              versions+=("v${BASH_REMATCH[1]}.${BASH_REMATCH[2]}")
+              versions+=("v${BASH_REMATCH[1]}")
+            fi
+          elif [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ] && [ -n "${INPUT_TAG:-}" ]; then
+            versions+=("${INPUT_TAG}")
+          else
+            versions+=("latest")
+          fi
+
+          lines=()
+          for p in "${prefixes[@]}"; do
+            for v in "${versions[@]}"; do
+              lines+=("${p}:${v}")
+            done
+            lines+=("${p}:${short}")
+          done
+
+          {
+            echo "tags<<__TAGS__"
+            printf '%s\n' "${lines[@]}"
+            echo "__TAGS__"
+          } >> "${GITHUB_OUTPUT}"
+
+          echo "本次将推送："
+          printf '  %s\n' "${lines[@]}"
+
+      - name: 准备 Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 登录 GitHub 镜像库
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 登录阿里云 ACR（可选）
+        if: env.ACR_PASSWORD != ''
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.ACR_REGISTRY }}
+          username: ${{ env.ACR_USERNAME }}
+          password: ${{ env.ACR_PASSWORD }}
+
+      - name: 构建并推送
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          # 服务器基本都是 x86，只编 amd64 省一半时间；
+          # 需要 arm（如 Oracle 免费机、M 系列 Mac）就改成 linux/amd64,linux/arm64。
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
+
+      - name: 写入运行摘要
+        run: |
+          {
+            echo "### ${{ matrix.image }}"
+            echo '```'
+            echo "${{ steps.meta.outputs.tags }}"
+            echo '```'
+          } >> "${GITHUB_STEP_SUMMARY}"
