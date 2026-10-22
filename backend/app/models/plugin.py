@@ -209,16 +209,26 @@ class RegistryToken(Base, IntegerPrimaryKeyMixin, TimestampMixin, SoftDeleteMixi
 
     只保存摘要与前缀：明文仅创建时返回一次，之后无法再读取，
     与「单条 settings 加密保存」相比更适合发给多个下游并逐个吊销。
+
+    令牌分两种归属，鉴权时一视同仁，只是「谁能在哪里看到、谁能吊销」不同：
+
+    - ``owner_id`` 为空：系统级令牌，由管理员在「系统设置 → 接入令牌」发放，
+      通常发给机房里的下游服务共用；
+    - ``owner_id`` 为某个账号：个人令牌，账号在「个人设置 → 接入令牌」自行创建，
+      账号之间互相看不见，也吊销不了对方的。
     """
 
     __tablename__ = "registry_tokens"
     __table_args__ = (
         UniqueConstraint("token_hash", name="uq_registry_token_hash"),
         Index("ix_registry_token_active", "is_deleted"),
+        Index("ix_registry_token_owner", "owner_id", "is_deleted"),
     )
 
     # 用途标注，例如「NapCatQQ Service 生产」，方便区分是谁在用。
     name: Mapped[str] = mapped_column(String(100), nullable=False, default="")
+    # 归属账号；老数据与系统级令牌为 NULL，表示「不属于任何个人」。
+    owner_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     # sha256 摘要，用于等值比对；不存明文。
     token_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     # 明文前缀（reg_ 加前 8 位），仅用于列表展示与人工核对。

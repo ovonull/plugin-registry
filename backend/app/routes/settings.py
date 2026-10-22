@@ -16,7 +16,7 @@ from app.schemas import (
     RegistrySettingsRequest,
     RegistryTokenCreateRequest,
 )
-from app.services.registry_token_service import RegistryTokenService, mask_prefix
+from app.services.registry_token_service import RegistryTokenService, token_item
 from app.services.setting_service import SettingService
 
 
@@ -150,26 +150,19 @@ async def save_animated_emoji(
     return success(data, "动画表情分类提示词已保存")
 
 
-def _registry_token_item(row) -> dict:
-    """列表展示用：只给前缀与时间，永远不返回明文。"""
-    return {
-        "id": row.id,
-        "name": row.name,
-        "prefix": mask_prefix(row.token_prefix),
-        "created_at": row.created_at.isoformat() if row.created_at else "",
-        "last_used_at": row.last_used_at.isoformat() if row.last_used_at else "",
-    }
-
-
 @router.get("/registry/tokens")
 async def list_registry_tokens(
     request: Request,
     session: AsyncSession = Depends(get_session),
 ) -> dict:
-    """列出当前有效的接入令牌（只含前缀，不含明文）。"""
+    """列出系统级接入令牌（只含前缀，不含明文）。
+
+    这里只管 ``owner_id`` 为空的令牌，即管理员发放给下游服务的「公共令牌」；
+    普通用户在个人设置里创建的令牌归属自己，只在他们自己的个人中心出现。
+    """
     await _require_admin(request, session)
-    rows = await RegistryTokenService().list_tokens(session)
-    return success({"items": [_registry_token_item(row) for row in rows]})
+    rows = await RegistryTokenService().list_tokens(session, None)
+    return success({"items": [token_item(row) for row in rows]})
 
 
 @router.post("/registry/tokens")
@@ -178,11 +171,11 @@ async def create_registry_token(
     request: Request,
     session: AsyncSession = Depends(get_session),
 ) -> dict:
-    """新建一枚接入令牌，明文只在这次响应里返回。"""
+    """新建一枚系统级接入令牌，明文只在这次响应里返回。"""
     await _require_admin(request, session)
-    row, plain = await RegistryTokenService().create(session, payload.name)
+    row, plain = await RegistryTokenService().create(session, payload.name, None)
     return success(
-        {"token": plain, "item": _registry_token_item(row)},
+        {"token": plain, "item": token_item(row)},
         "令牌已创建，请立即复制",
     )
 
@@ -193,7 +186,10 @@ async def revoke_registry_token(
     request: Request,
     session: AsyncSession = Depends(get_session),
 ) -> dict:
-    """吊销一枚接入令牌，立即失效。"""
+    """吊销一枚接入令牌，立即失效。
+
+    管理员不受归属限制，个人令牌出现滥用时也能在这里直接吊销。
+    """
     await _require_admin(request, session)
-    await RegistryTokenService().revoke(session, token_id)
+    await RegistryTokenService().revoke(session, token_id, any_owner=True)
     return success({"id": token_id}, "令牌已吊销")

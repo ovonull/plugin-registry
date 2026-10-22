@@ -1,19 +1,33 @@
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { KeyRound, Mail, Save, ShieldCheck, UserRound } from 'lucide-vue-next'
-import { authApi } from '../api'
+import {
+  Copy,
+  KeyRound,
+  KeySquare,
+  Link2,
+  Mail,
+  Plus,
+  Save,
+  ShieldCheck,
+  Trash2,
+  UserRound,
+} from 'lucide-vue-next'
+import { authApi, profileApi } from '../api'
+import BaseModal from '../components/common/BaseModal.vue'
 import GeetestCaptcha from '../components/common/GeetestCaptcha.vue'
 import PasswordInput from '../components/common/PasswordInput.vue'
 import { useAuth } from '../composables/useAuth'
+import { useClipboard } from '../composables/useClipboard'
 import { useCountdown } from '../composables/useCountdown'
 import { useToast } from '../composables/useToast'
-import type { GeetestResult } from '../types'
+import type { GeetestResult, RegistryTokenItem } from '../types'
 
-type Tab = 'profile' | 'email' | 'password'
+type Tab = 'profile' | 'email' | 'token' | 'password'
 const router = useRouter()
 const auth = useAuth()
 const toast = useToast()
+const { copyText } = useClipboard()
 const activeTab = ref<Tab>('profile')
 const profile = reactive({ nickname: auth.state.user?.nickname || '' })
 const password = reactive({ current: '', next: '', confirm: '' })
@@ -27,12 +41,76 @@ const { countdown, startCountdown } = useCountdown()
 const tabs = [
   { value: 'profile' as const, label: '个人资料', icon: UserRound },
   { value: 'email' as const, label: '邮箱设置', icon: Mail },
+  { value: 'token' as const, label: '接入令牌', icon: KeySquare },
   { value: 'password' as const, label: '修改密码', icon: KeyRound },
 ]
 
 function resetCaptcha() {
   geetest.value = null
   captchaKey.value += 1
+}
+
+/* ------------------------------------------------------------ 接入令牌 */
+
+const tokens = ref<RegistryTokenItem[]>([])
+const tokensLoading = ref(false)
+const tokenModalOpen = ref(false)
+const tokenName = ref('')
+const tokenCreating = ref(false)
+/** 刚创建出来的明文令牌，只在弹窗里显示一次。 */
+const createdToken = ref('')
+/** 后端给出的对外服务基址；没配置 PUBLIC_SERVICE_URL 时可能为空。 */
+const tokenEndpoint = ref('')
+
+// 兜底用当前站点域名：前端 nginx 会把 /api 反代给后端，所以站点域名一定调得通。
+const apiBase = computed(() => tokenEndpoint.value || window.location.origin)
+const apiIndexUrl = computed(() => `${apiBase.value}/api/registry/index.json`)
+const apiPackageUrl = computed(
+  () => `${apiBase.value}/api/registry/packages/{plugin_id}/{version}.zip`,
+)
+
+function formatTokenTime(value: string): string {
+  if (!value) return '—'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '—'
+  return date.toLocaleString('zh-CN', { hour12: false })
+}
+
+async function loadTokens() {
+  tokensLoading.value = true
+  const result = await profileApi.listRegistryTokens()
+  tokensLoading.value = false
+  if (!result.success) return toast.show(result.message, 'error')
+  tokens.value = result.data?.items || []
+  tokenEndpoint.value = result.data?.endpoint || ''
+}
+
+function switchTab(tab: Tab) {
+  activeTab.value = tab
+  // 令牌列表按需加载，别在打开个人资料页时就多发一次请求。
+  if (tab === 'token') loadTokens()
+}
+
+function openTokenModal() {
+  tokenName.value = ''
+  createdToken.value = ''
+  tokenModalOpen.value = true
+}
+
+async function createToken() {
+  tokenCreating.value = true
+  const result = await profileApi.createRegistryToken({ name: tokenName.value.trim() })
+  tokenCreating.value = false
+  if (!result.success) return toast.show(result.message, 'error')
+  createdToken.value = result.data?.token || ''
+  await loadTokens()
+}
+
+async function revokeToken(item: RegistryTokenItem) {
+  const result = await profileApi.revokeRegistryToken(item.id)
+  if (!result.success) return toast.show(result.message, 'error')
+  toast.show(result.message, 'success')
+  await loadTokens()
 }
 
 async function saveProfile() {
@@ -84,9 +162,9 @@ async function savePassword() {
 
 <template>
   <div class="page-enter profile-page">
-    <div class="page-heading"><div><p class="eyebrow">ACCOUNT</p><h1>个人设置</h1><p>分别管理个人资料、邮箱身份和登录密码。</p></div></div>
+    <div class="page-heading"><div><p class="eyebrow">ACCOUNT</p><h1>个人设置</h1><p>分别管理个人资料、邮箱身份、接入令牌和登录密码。</p></div></div>
     <div class="inner-tabs" role="tablist">
-      <button v-for="tab in tabs" :key="tab.value" type="button" :class="{ active: activeTab === tab.value }" @click="activeTab = tab.value"><component :is="tab.icon" :size="17" />{{ tab.label }}</button>
+      <button v-for="tab in tabs" :key="tab.value" type="button" :class="{ active: activeTab === tab.value }" @click="switchTab(tab.value)"><component :is="tab.icon" :size="17" />{{ tab.label }}</button>
     </div>
 
     <section v-if="activeTab === 'profile'" class="content-panel settings-module">
@@ -109,6 +187,51 @@ async function savePassword() {
       </form>
     </section>
 
+    <section v-else-if="activeTab === 'token'" class="content-panel settings-module">
+      <div class="panel-heading">
+        <div><h2><KeySquare :size="18" />接入令牌</h2><p>下游程序靠这里的令牌调用插件库分发接口，每个账号只看得到自己创建的令牌。</p></div>
+        <button type="button" class="button primary" @click="openTokenModal"><Plus :size="16" />创建令牌</button>
+      </div>
+
+      <div class="api-endpoint">
+        <div class="api-endpoint-row">
+          <span class="api-endpoint-label"><Link2 :size="14" />API 调用地址</span>
+          <code>{{ apiIndexUrl }}</code>
+          <button type="button" class="api-endpoint-copy" title="复制调用地址" @click="copyText(apiIndexUrl, '调用地址已复制')"><Copy :size="15" /></button>
+        </div>
+        <div class="api-endpoint-row">
+          <span class="api-endpoint-label">插件包地址</span>
+          <code>{{ apiPackageUrl }}</code>
+          <button type="button" class="api-endpoint-copy" title="复制插件包地址" @click="copyText(apiPackageUrl, '插件包地址已复制')"><Copy :size="15" /></button>
+        </div>
+      </div>
+
+      <div class="token-table">
+        <div class="token-table-head">
+          <span>名称</span><span>Key</span><span>创建时间</span><span>最后使用</span><span>操作</span>
+        </div>
+        <div v-for="item in tokens" :key="item.id" class="token-table-row">
+          <span class="token-name">{{ item.name || '未命名令牌' }}</span>
+          <code>{{ item.prefix }}</code>
+          <span>{{ formatTokenTime(item.created_at) }}</span>
+          <span :class="{ 'token-idle': !item.last_used_at }">{{ item.last_used_at ? formatTokenTime(item.last_used_at) : '从未使用' }}</span>
+          <button type="button" class="token-revoke" title="吊销令牌" @click="revokeToken(item)">
+            <Trash2 :size="15" />
+          </button>
+        </div>
+        <p v-if="tokensLoading" class="token-empty">加载中…</p>
+        <p v-else-if="!tokens.length" class="token-empty">还没有令牌，点右上角创建一枚。</p>
+      </div>
+
+      <p class="form-hint">
+        请求时带上 <code>Authorization: Bearer &lt;令牌&gt;</code> 或 <code>X-Registry-Token</code> 请求头。
+        明文只在创建时显示一次，库里只保存摘要；泄露了就吊销重新创建。
+      </p>
+      <p class="form-hint">
+        地址取自服务端配置；若站点外面还挂了域名或反向代理，在部署的 <code>.env</code> 里设置 <code>PUBLIC_SERVICE_URL</code>，这两个地址会跟着变。
+      </p>
+    </section>
+
     <section v-else class="content-panel settings-module">
       <div class="panel-heading"><div><h2><KeyRound :size="18" />修改密码</h2><p>修改成功后会撤销全部登录会话。</p></div></div>
       <form class="settings-form" @submit.prevent="savePassword">
@@ -117,5 +240,30 @@ async function savePassword() {
         <div class="form-actions"><button class="button primary" type="submit" :disabled="loading"><span v-if="loading" class="button-spinner" /><Save :size="16" />更新密码</button></div>
       </form>
     </section>
+
+    <BaseModal :open="tokenModalOpen" title="创建接入令牌" @close="tokenModalOpen = false">
+      <div v-if="!createdToken" class="modal-form">
+        <label class="field-label">用途标注
+          <input v-model="tokenName" maxlength="100" placeholder="例如：我的插件市场" />
+        </label>
+        <p class="form-hint">标注只用于区分是谁在用，方便以后单独吊销。</p>
+        <div class="modal-form-actions">
+          <button type="button" class="button secondary" @click="tokenModalOpen = false">取消</button>
+          <button type="button" class="button primary" :disabled="tokenCreating" @click="createToken">
+            <span v-if="tokenCreating" class="button-spinner" />创建
+          </button>
+        </div>
+      </div>
+      <div v-else class="modal-form">
+        <p class="form-hint">这枚令牌只显示这一次，请立刻复制保存。</p>
+        <div class="token-reveal">
+          <code>{{ createdToken }}</code>
+        </div>
+        <div class="modal-form-actions">
+          <button type="button" class="button secondary" @click="copyText(createdToken, '令牌已复制')"><Copy :size="15" />复制</button>
+          <button type="button" class="button primary" @click="tokenModalOpen = false">我已保存</button>
+        </div>
+      </div>
+    </BaseModal>
   </div>
 </template>

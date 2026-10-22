@@ -103,6 +103,25 @@ export const authApi = {
     }),
 }
 
+/**
+ * 个人中心接口：普通账号管理自己的插件库接入令牌。
+ *
+ * 与 settingsApi 上那组管理员接口的区别是「只看得到自己创建的令牌」，
+ * 列表里额外返回下游应使用的服务地址，供页面展示成「API 调用地址」。
+ */
+export const profileApi = {
+  listRegistryTokens: () =>
+    request<{ items: RegistryTokenItem[]; endpoint: string }>({
+      url: '/profile/registry-tokens',
+    }),
+  createRegistryToken: (payload: { name: string }) =>
+    request<{ token: string; item: RegistryTokenItem }>({
+      url: '/profile/registry-tokens', method: 'POST', data: payload,
+    }),
+  revokeRegistryToken: (id: number) =>
+    request<{ id: number }>({ url: `/profile/registry-tokens/${id}`, method: 'DELETE' }),
+}
+
 export const userApi = {
   list: (params: { page: number; page_size: number }) =>
     request<Pagination<ManagedUser>>({ url: '/users', params }),

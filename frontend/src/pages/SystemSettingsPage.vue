@@ -5,6 +5,7 @@ import { pluginAdminApi, settingsApi } from '../api'
 import BaseModal from '../components/common/BaseModal.vue'
 import LoadingOverlay from '../components/common/LoadingOverlay.vue'
 import PasswordInput from '../components/common/PasswordInput.vue'
+import { useClipboard } from '../composables/useClipboard'
 import { useSystemSettings } from '../composables/useSystemSettings'
 import { themeColors, themeFonts, useTheme } from '../composables/useTheme'
 import { useToast } from '../composables/useToast'
@@ -153,27 +154,7 @@ async function savePluginSync() {
 }
 
 /** 复制文本；clipboard API 需要安全上下文，http + IP 访问时退回 execCommand。 */
-async function copyText(text: string, successText = '已复制'): Promise<void> {
-  if (!text) return
-  try {
-    if (navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(text)
-      toast.show(successText, 'success')
-      return
-    }
-  } catch {
-    /* 继续走下面的兜底 */
-  }
-  const area = document.createElement('textarea')
-  area.value = text
-  area.style.position = 'fixed'
-  area.style.opacity = '0'
-  document.body.appendChild(area)
-  area.select()
-  const copied = document.execCommand('copy')
-  document.body.removeChild(area)
-  toast.show(copied ? successText : '复制失败，请手动选中复制', copied ? 'success' : 'error')
-}
+const { copyText } = useClipboard()
 
 // ---------------------------------------------------------------- 接入令牌
 

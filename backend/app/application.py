@@ -38,6 +38,7 @@ from app.routes import (
     onebot,
     plugin_admin,
     plugins,
+    profile,
     registry,
     scheduled_tasks,
     settings as settings_routes,
@@ -361,6 +362,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
 
     app.include_router(auth.router)
+    app.include_router(profile.router)
     app.include_router(geetest.router)
     app.include_router(settings_routes.router)
     app.include_router(dictionaries.router)

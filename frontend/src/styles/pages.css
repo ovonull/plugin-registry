@@ -304,10 +304,68 @@
   text-align: center;
 }
 
+/* 「接入令牌」页签顶部的 API 调用地址：把下游要填的地址直接摆出来，配一键复制 */
+.api-endpoint {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-soft);
+}
+
+.api-endpoint-row {
+  display: grid;
+  grid-template-columns: 104px minmax(0, 1fr) 30px;
+  gap: 10px;
+  align-items: center;
+}
+
+.api-endpoint-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.api-endpoint code {
+  padding: 6px 9px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--text);
+  font: 12px/1.5 'Cascadia Mono', Consolas, monospace;
+  word-break: break-all;
+  user-select: all;
+}
+
+.api-endpoint-copy {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  place-items: center;
+}
+
+.api-endpoint-copy:hover {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
 @media (max-width: 760px) {
   .token-table-head { display: none; }
   .token-table-row { grid-template-columns: 1fr auto; row-gap: 6px; }
   .token-table-row > span:nth-child(3),
   .token-table-row > span:nth-child(4) { color: var(--text-muted); font-size: 11px; }
   .token-table-row > code { grid-column: 1 / -1; }
+  .api-endpoint-row { grid-template-columns: minmax(0, 1fr) 30px; row-gap: 6px; }
+  .api-endpoint-label { grid-column: 1 / -1; }
 }
