@@ -186,9 +186,29 @@ class PluginService:
             repo_url = ""
             reference = ""
 
+        # 先只读清单做查重，避免重复上传把已归档的原始包冲掉：
+        # save_archive 是直接覆盖写，一旦写了新内容而版本记录被拒，
+        # 库里 checksum 还是旧的、磁盘上却已经是新包，下游安装必然校验失败。
+        peeked = self.source_service.peek_manifest(archive)
+        peeked_id = str(peeked.get("id") or "")
+        peeked_version = str(peeked.get("version") or "")
+        if peeked_id and peeked_version:
+            duplicate = await session.scalar(
+                select(PluginVersion).where(
+                    PluginVersion.plugin_id == peeked_id,
+                    PluginVersion.version == peeked_version,
+                )
+            )
+            if duplicate is not None:
+                raise BusinessError(
+                    f"插件 {peeked_id} 的版本 {peeked_version} 已提交过，"
+                    "请修改清单中的版本号后重新上传",
+                    CODE_PLUGIN_VERSION_EXISTS,
+                )
+
         package = self.source_service.prepare_package(archive)
         manifest = package.manifest
-        # 同时存档提交时的原始压缩包：下游插件市场下载这份字节，
+        # 校验通过后再存档原始压缩包：下游插件市场下载这份字节，
         # sha256 与入库 checksum 一致，可以做到下载后直接校验。
         self.source_service.save_archive(
             archive, package.plugin_id, package.version
