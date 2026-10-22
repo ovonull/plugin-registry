@@ -135,6 +135,17 @@ async function saveIntroduction() {
   toast.show(result.message, 'success')
 }
 
+// 小眼睛点开时才解密一次，避免明文随页面一起下发。
+async function revealSecret(group: string, field: string): Promise<string> {
+  const result = await settingsApi.revealGroup(group)
+  if (!result.success) {
+    toast.show(result.message, 'error')
+    return ''
+  }
+  const value = (result.data as Record<string, unknown>)[field]
+  return value === undefined || value === null ? '' : String(value)
+}
+
 async function saveGithub() {
   saving.value = true
   const result = await settingsApi.saveGithub(github)
@@ -217,7 +228,7 @@ onMounted(() => loadGroup('email'))
       <div class="panel-heading"><div><h2><Mail :size="18" />SMTP 发件人设置</h2><p>用于发送注册、登录和邮箱绑定验证码。</p></div></div>
       <form class="settings-form" @submit.prevent="saveEmail">
         <div class="form-grid"><label>SMTP 服务器<input v-model.trim="email.host" required maxlength="255" placeholder="smtp.example.com" /></label><label>SMTP 端口<input v-model.number="email.port" type="number" required min="1" max="65535" /></label></div>
-        <div class="form-grid"><label>SMTP 账号<input v-model.trim="email.username" required maxlength="255" placeholder="name@example.com" /></label><label>SMTP 密码 / 授权码<PasswordInput v-model="email.password" placeholder="留空或保留掩码表示不修改" /></label></div>
+        <div class="form-grid"><label>SMTP 账号<input v-model.trim="email.username" required maxlength="255" placeholder="name@example.com" /></label><label>SMTP 密码 / 授权码<PasswordInput v-model="email.password" placeholder="留空或保留掩码表示不修改" :reveal="() => revealSecret('email', 'password')" /></label></div>
         <div class="form-grid"><label>发件人名称<input v-model.trim="email.sender_name" required maxlength="128" /></label><label class="toggle-field"><span><strong>SSL 加密</strong><small>关闭时使用 STARTTLS</small></span><button class="switch" :class="{ active: email.use_ssl }" type="button" role="switch" :aria-checked="email.use_ssl" @click="email.use_ssl = !email.use_ssl"><i /></button></label></div>
         <div class="form-actions"><button class="button primary" type="submit" :disabled="saving"><span v-if="saving" class="button-spinner" /><Save :size="16" />保存发件人设置</button></div>
       </form>
@@ -289,7 +300,7 @@ onMounted(() => loadGroup('email'))
     <section v-else-if="activeTab === 'github'" class="content-panel settings-module">
       <div class="panel-heading"><div><h2><Github :size="18" />GitHub 接口设置</h2><p>用于探测代码仓库版本，配置后可提升 GitHub API 调用额度。</p></div></div>
       <form class="settings-form" @submit.prevent="saveGithub">
-        <label>GitHub Personal Access Token<PasswordInput v-model="github.plugin_repo_token" placeholder="github_pat_..." /><small>建议使用 Fine-grained token，仅授予仓库 Metadata 和 Contents 的 Read-only 权限。留空并保存可清除配置。</small></label>
+        <label>GitHub Personal Access Token<PasswordInput v-model="github.plugin_repo_token" placeholder="github_pat_..." :reveal="() => revealSecret('github', 'plugin_repo_token')" /><small>建议使用 Fine-grained token，仅授予仓库 Metadata 和 Contents 的 Read-only 权限。留空保存表示保持原值不变，点右侧小眼睛可查看已保存的令牌。</small></label>
         <div class="form-actions"><button class="button primary" type="submit" :disabled="saving"><span v-if="saving" class="button-spinner" /><Save :size="16" />保存 GitHub 设置</button></div>
       </form>
       <LoadingOverlay :visible="loading" contained />

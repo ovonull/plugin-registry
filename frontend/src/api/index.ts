@@ -175,6 +175,9 @@ export const featuresApi = {
 
 export const settingsApi = {
   group: <T>(group: string) => request<T>({ url: `/settings/${group}` }),
+  // 只在小眼睛点开时调用，按需取回敏感项明文。
+  revealGroup: (group: string) =>
+    request<Record<string, unknown>>({ url: `/settings/${group}/reveal` }),
   saveEmail: (payload: EmailSettings) =>
     request<EmailSettings>({ url: '/settings/email/save', method: 'PUT', data: payload }),
   saveAppearance: (payload: AppearanceSettings) =>

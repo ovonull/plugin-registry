@@ -46,6 +46,23 @@ async def get_group(
     return success(await SettingService(session).get_group(group))
 
 
+@router.get("/{group}/reveal")
+async def reveal_group(
+    group: str,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """管理员按需查看敏感配置的明文。
+
+    列表接口一律返回掩码，只有点了「小眼睛」才调这里解密一次，
+    避免明文随页面一起下发、被浏览器缓存或前端日志带走。
+    """
+    await _require_admin(request, session)
+    if group not in {"email", "github", "registry"}:
+        raise BusinessError("该分组没有可查看的敏感配置", 40041)
+    return success(await SettingService(session).get_group(group, mask_sensitive=False))
+
+
 @router.put("/email/save")
 async def save_email(
     payload: EmailSettingsRequest,
