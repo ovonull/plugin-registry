@@ -126,7 +126,10 @@ system.loadPublic()
           <label>邮箱验证码<div class="code-row"><div class="input-with-icon"><KeyRound :size="17" /><input v-model.trim="emailCode" required inputmode="numeric" maxlength="6" placeholder="6位数字验证码" /></div><button class="button secondary code-button" type="button" :disabled="sending || countdown > 0" @click="sendCode"><span v-if="sending" class="button-spinner" />{{ countdown > 0 ? `${countdown}秒` : '发送验证码' }}</button></div></label>
           <button class="button primary button-wide" type="submit" :disabled="loading"><span v-if="loading" class="button-spinner" />注册并登录</button>
         </form>
-        <p class="auth-switch">已有账号？<RouterLink to="/login">返回登录</RouterLink> · <RouterLink to="/">返回插件库首页</RouterLink></p>
+        <p class="auth-switch">
+          <span>已有账号？<RouterLink to="/login">返回登录</RouterLink></span>
+          <RouterLink to="/">返回首页</RouterLink>
+        </p>
       </div>
       <footer class="auth-footer">PlugHub 插件库 · 插件分发与审核平台</footer>
     </section>

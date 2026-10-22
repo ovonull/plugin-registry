@@ -136,7 +136,10 @@ onMounted(async () => {
           <label>滑动验证<GeetestCaptcha :key="captchaKey" :disabled="loading" @success="geetest = $event" /></label>
           <button class="button primary button-wide" type="submit" :disabled="loading"><span v-if="loading" class="button-spinner" />登录</button>
         </form>
-        <p class="auth-switch">还没有账号？<RouterLink to="/register">立即注册</RouterLink> · <RouterLink to="/">返回插件库首页</RouterLink></p>
+        <p class="auth-switch">
+          <span>还没有账号？<RouterLink to="/register">立即注册</RouterLink></span>
+          <RouterLink to="/">返回首页</RouterLink>
+        </p>
       </div>
       <footer class="auth-footer">PlugHub 插件库 · 插件分发与审核平台</footer>
     </section>
