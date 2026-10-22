@@ -8,8 +8,14 @@
 - ``/api/registry/stats``：首页顶部统计；
 - ``/api/registry/packages/{plugin_id}/{version}.zip``：插件包下载。
 
-鉴权：全部接口都要求通过 ``require_registry_access``，接受「后台配置的接入令牌」
-或「已登录账号会话」；数据本身只包含已上架、当前版本审核通过的插件。
+鉴权分两类：
+
+- **展示类**（plugins / stats / 详情）**不需要登录**，任何人都能看到已上架插件，
+  这样插件库首页才是真正对外的门面；
+- **分发类**（index.json / 插件包下载）仍要求 ``require_registry_access``，即
+  「后台配置的接入令牌」或「已登录账号会话」，避免索引和安装包被随意抓取。
+
+两类接口都只返回已上架、当前版本审核通过的插件。
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -27,8 +33,9 @@ from app.services.plugin_registry_export_service import (
 
 router = APIRouter(prefix="/api/registry", tags=["插件库分发"])
 
-# 接口带鉴权，响应只允许在请求方私有缓存里短暂保存，不能被共享代理缓存。
-PRIVATE_CACHE_HEADERS = {"Cache-Control": "private, max-age=30"}
+# 展示类接口对匿名访客开放，允许共享缓存短暂保存；上架变更 30 秒内生效。
+PUBLIC_CACHE_HEADERS = {"Cache-Control": "public, max-age=30"}
+
 
 
 @router.get("/index.json")
@@ -82,9 +89,8 @@ async def registry_plugins(
     sort: str = Query(SORT_ALL, max_length=20),
     page: int = Query(1, ge=1),
     page_size: int = Query(12, ge=1, le=60),
-    _access: str = Depends(require_registry_access),
 ) -> JSONResponse:
-    """分页返回插件列表，供展示首页使用。"""
+    """分页返回插件列表，供展示首页使用（匿名可访问）。"""
     service = RegistryExportService()
     data = await service.list_plugins(
         session,
@@ -93,31 +99,29 @@ async def registry_plugins(
         page=page,
         page_size=page_size,
     )
-    return JSONResponse(content=success(data), headers=PRIVATE_CACHE_HEADERS)
+    return JSONResponse(content=success(data), headers=PUBLIC_CACHE_HEADERS)
 
 
 @router.get("/stats")
 async def registry_stats(
     session: AsyncSession = Depends(get_session),
-    _access: str = Depends(require_registry_access),
 ) -> JSONResponse:
-    """返回首页顶部统计数字。"""
+    """返回首页顶部统计数字（匿名可访问）。"""
     service = RegistryExportService()
     data = await service.build_stats(session)
-    return JSONResponse(content=success(data), headers=PRIVATE_CACHE_HEADERS)
+    return JSONResponse(content=success(data), headers=PUBLIC_CACHE_HEADERS)
 
 
 @router.get("/plugins/{plugin_id}")
 async def registry_plugin_detail(
     plugin_id: str,
     session: AsyncSession = Depends(get_session),
-    _access: str = Depends(require_registry_access),
 ) -> JSONResponse:
-    """返回单个插件详情，不存在或未上架时 data 为空。
+    """返回单个插件详情，不存在或未上架时 data 为空（匿名可访问）。
 
     不走 HTTP 404：前端统一按业务响应解析，404 会被当成网络异常，
     提示语反而变成「无法连接服务」。
     """
     service = RegistryExportService()
     data = await service.plugin_detail(session, plugin_id)
-    return JSONResponse(content=success(data), headers=PRIVATE_CACHE_HEADERS)
+    return JSONResponse(content=success(data), headers=PUBLIC_CACHE_HEADERS)

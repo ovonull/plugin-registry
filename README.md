@@ -184,20 +184,25 @@ journalctl -u pluginhub -f
 
 ## 分发接口与鉴权
 
-所有分发接口都需要鉴权，两种身份任选：
+**展示类接口（公开，不需要登录）** —— 插件库首页用的就是这几个，任何人都能访问：
+
+| 接口 | 说明 |
+|---|---|
+| `GET /api/registry/plugins` | 分页列表，支持 `keyword`、`sort=all\|latest\|popular\|name` |
+| `GET /api/registry/plugins/{plugin_id}` | 插件详情与版本历史 |
+| `GET /api/registry/stats` | 插件数、安装数、作者数 |
+
+**分发类接口（需要鉴权）** —— 给下游插件市场同步与安装用，两种身份任选：
 
 - `Authorization: Bearer <接入令牌>` 或 `X-Registry-Token: <接入令牌>` —— 给下游程序用
 - 已登录账号的会话令牌 —— 给前端页面用
 
-令牌在 **系统设置 → 接入令牌** 生成并保存（也可用 `.env` 的 `REGISTRY_TOKEN`）。留空表示只有登录账号能访问。
-
 | 接口 | 说明 |
 |---|---|
 | `GET /api/registry/index.json` | 已上架插件索引，下游定时同步用 |
-| `GET /api/registry/plugins` | 分页列表，支持 `keyword`、`sort=all\|latest\|popular\|name` |
-| `GET /api/registry/plugins/{plugin_id}` | 插件详情与版本历史 |
-| `GET /api/registry/stats` | 插件数、安装数、作者数 |
 | `GET /api/registry/packages/{plugin_id}/{version}.zip` | 下载当前生效版本的插件包 |
+
+令牌在 **系统设置 → 接入令牌** 生成并保存（也可用 `.env` 的 `REGISTRY_TOKEN`）。留空表示只有登录账号能下载。
 
 示例：
 

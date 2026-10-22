@@ -9,6 +9,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import {
+  AlertTriangle,
   ArrowRight,
   Boxes,
   ChevronLeft,
@@ -19,10 +20,10 @@ import {
   Github,
   Layers,
   LayoutGrid,
-  Lock,
   LogIn,
   Moon,
   Package,
+  RefreshCw,
   Search,
   ShieldCheck,
   Sparkles,
@@ -53,8 +54,8 @@ const stats = ref<RegistryStats>({
 const detail = ref<RegistryPlugin | null>(null)
 const detailOpen = ref(false)
 const detailLoading = ref(false)
-// 接口需要鉴权：未登录访客只看到登录引导，不展示任何插件数据。
-const needAuth = ref(false)
+// 列表接口对匿名访客开放，这里只处理真正的加载失败（网络异常、服务未启动等）。
+const loadError = ref('')
 
 const loggedIn = computed(() => Boolean(auth.state.user))
 const sortOptions = [
@@ -136,21 +137,16 @@ async function loadPlugins() {
   })
   loading.value = false
   if (!result.success) {
-    // 40100 表示未登录且没有接入令牌，此时页面切成登录引导。
-    if (result.code === 40100) needAuth.value = true
+    loadError.value = result.message || '插件列表加载失败'
     return
   }
-  needAuth.value = false
+  loadError.value = ''
   if (result.data) plugins.value = result.data
 }
 
 async function loadStats() {
   const result = await registryApi.stats()
-  if (!result.success) {
-    if (result.code === 40100) needAuth.value = true
-    return
-  }
-  if (result.data) stats.value = result.data
+  if (result.success && result.data) stats.value = result.data
 }
 
 async function openDetail(plugin: RegistryPlugin) {
@@ -262,16 +258,16 @@ onMounted(() => {
     </section>
 
     <main id="plugins" class="home-main">
-      <div v-if="needAuth" class="home-locked">
-        <div class="home-locked-icon"><Lock :size="24" /></div>
-        <h2>插件索引仅对授权对象开放</h2>
-        <p>索引、插件详情与插件包下载都需要鉴权。登录账号即可浏览，下游程序请使用接入令牌。</p>
-        <button type="button" class="home-cta" @click="enterConsole">
-          <LogIn :size="16" />登录 / 注册
+      <div v-if="loadError" class="home-locked">
+        <div class="home-locked-icon"><AlertTriangle :size="24" /></div>
+        <h2>插件列表加载失败</h2>
+        <p>{{ loadError }}。稍后重新加载，或检查服务是否正常启动。</p>
+        <button type="button" class="home-cta" @click="loadPlugins">
+          <RefreshCw :size="16" />重新加载
         </button>
       </div>
 
-      <div v-if="!needAuth" class="home-toolbar">
+      <div v-if="!loadError" class="home-toolbar">
         <div class="home-tabs">
           <button
             v-for="item in sortOptions"
@@ -286,11 +282,11 @@ onMounted(() => {
         <span class="home-count">共 {{ plugins.total }} 个插件</span>
       </div>
 
-      <div v-if="!needAuth && loading" class="home-skeleton-grid">
+      <div v-if="!loadError && loading" class="home-skeleton-grid">
         <div v-for="index in 6" :key="index" class="home-skeleton" />
       </div>
 
-      <div v-else-if="!needAuth && plugins.items.length" class="home-grid">
+      <div v-else-if="!loadError && plugins.items.length" class="home-grid">
         <article
           v-for="plugin in plugins.items"
           :key="plugin.plugin_id"
@@ -342,9 +338,9 @@ onMounted(() => {
         </article>
       </div>
 
-      <EmptyState v-else-if="!needAuth" text="没有匹配的插件，换个关键词试试" />
+      <EmptyState v-else-if="!loadError" text="没有匹配的插件，换个关键词试试" />
 
-      <div v-if="!needAuth && plugins.pages > 1" class="home-pager">
+      <div v-if="!loadError && plugins.pages > 1" class="home-pager">
         <button type="button" :disabled="page <= 1" @click="goPage(page - 1)">
           <ChevronLeft :size="16" />上一页
         </button>

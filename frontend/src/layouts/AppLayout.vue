@@ -113,7 +113,8 @@ async function logout() {
   await authApi.logout()
   auth.clearSession()
   toast.show('已退出登录', 'success')
-  router.replace('/login')
+  // 退出后回到公开首页（游客视角），不要停在登录页——那里没有回首页的入口。
+  router.replace('/')
 }
 
 function navigate(path: string) {
