@@ -762,13 +762,18 @@ class PluginService:
             session.add(plugin)
             await session.flush()
             return plugin
-        if not is_admin(user) and plugin.owner_id != user.id:
+        if plugin.is_deleted:
+            # 插件已删除时标识重新开放：删除流程已清空版本与安装记录，
+            # 这里直接把归属转给当前提交者，别让旧记录长期占着 id。
+            plugin.is_deleted = False
+            plugin.owner_id = user.id
+            plugin.is_published = False
+            plugin.current_version_id = None
+        elif not is_admin(user) and plugin.owner_id != user.id:
             raise BusinessError(
                 f"插件标识 {plugin_id} 已被其他用户占用，请修改清单中的 id",
                 CODE_PLUGIN_ID_TAKEN,
             )
-        if plugin.is_deleted:
-            plugin.is_deleted = False
         for key, value in values.items():
             setattr(plugin, key, value)
         plugin.updated_at = beijing_now()
