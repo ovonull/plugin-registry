@@ -59,6 +59,7 @@ SOURCE_TYPE_ZIP = "zip"
 VALID_SOURCE_TYPES = (SOURCE_TYPE_REPO, SOURCE_TYPE_ZIP)
 REVIEW_STATUS_PENDING = "pending"
 REVIEW_STATUS_APPROVED = "approved"
+REVIEW_STATUS_REJECTED = "rejected"
 
 # 审核流水里的上下架状态，与 plugin_review_service 保持同一套取值。
 VISIBILITY_PUBLISHED = "published"
@@ -194,7 +195,8 @@ class PluginService:
                     PluginVersion.version == peeked_version,
                 )
             )
-            if duplicate is not None:
+            # 被驳回的版本允许修完问题后重新提交同一个版本号。
+            if duplicate is not None and duplicate.review_status != REVIEW_STATUS_REJECTED:
                 raise BusinessError(
                     f"插件 {peeked_id} 的版本 {peeked_version} 已提交过，"
                     "请修改清单中的版本号后重新上传",
@@ -215,7 +217,12 @@ class PluginService:
                 PluginVersion.version == package.version,
             )
         )
-        if existing_version is not None:
+        # 被驳回的版本允许复用原记录重新走审核，保证一个版本只有一条记录。
+        reuse_rejected = (
+            existing_version is not None
+            and existing_version.review_status == REVIEW_STATUS_REJECTED
+        )
+        if existing_version is not None and not reuse_rejected:
             hint = "请修改清单中的版本号后重新上传"
             if source_type == SOURCE_TYPE_REPO and not str(source_ref or "").strip():
                 hint = (
@@ -239,39 +246,52 @@ class PluginService:
             auto_comment = "信任作者提交，免审直接上架"
         else:
             auto_comment = ""
-        version_row = PluginVersion(
-            plugin_id=package.plugin_id,
-            version=package.version,
-            manifest_json=json.dumps(manifest, ensure_ascii=False, sort_keys=True),
-            capabilities_json=json.dumps(manifest["capabilities"], ensure_ascii=False),
-            granted_capabilities_json=(
+        version_values = {
+            "manifest_json": json.dumps(manifest, ensure_ascii=False, sort_keys=True),
+            "capabilities_json": json.dumps(manifest["capabilities"], ensure_ascii=False),
+            "granted_capabilities_json": (
                 json.dumps(manifest["capabilities"], ensure_ascii=False)
                 if auto_review
                 else "[]"
             ),
-            entry=str(manifest["entry"]),
-            package_path=package.package_path,
-            checksum=package.checksum,
-            source_ref=reference,
-            review_status=REVIEW_STATUS_APPROVED if auto_review else REVIEW_STATUS_PENDING,
-            reviewed_by=user.id if auto_review else None,
-            reviewed_at=beijing_now() if auto_review else None,
-            review_comment=auto_comment,
-            min_host_version=str(manifest["min_host_version"]),
-            max_host_version=str(manifest["max_host_version"]),
-            owner_id=user.id,
-        )
-        session.add(version_row)
+            "entry": str(manifest["entry"]),
+            "package_path": package.package_path,
+            "checksum": package.checksum,
+            "source_ref": reference,
+            "review_status": REVIEW_STATUS_APPROVED if auto_review else REVIEW_STATUS_PENDING,
+            "reviewed_by": user.id if auto_review else None,
+            "reviewed_at": beijing_now() if auto_review else None,
+            "review_comment": auto_comment,
+            "min_host_version": str(manifest["min_host_version"]),
+            "max_host_version": str(manifest["max_host_version"]),
+        }
+        if reuse_rejected:
+            # 复用被驳回的记录：包路径、清单与审核状态全部换成这次提交的内容。
+            version_row = existing_version
+            for field, value in version_values.items():
+                setattr(version_row, field, value)
+        else:
+            version_row = PluginVersion(
+                plugin_id=package.plugin_id,
+                version=package.version,
+                owner_id=user.id,
+                **version_values,
+            )
+            session.add(version_row)
         await session.flush()
         session.add(
             PluginReview(
                 plugin_id=package.plugin_id,
                 version=package.version,
                 action="submit",
-                from_status="",
+                from_status=REVIEW_STATUS_REJECTED if reuse_rejected else "",
                 to_status=REVIEW_STATUS_PENDING,
                 reviewer_id=user.id,
-                comment="提交插件版本，等待管理员审核",
+                comment=(
+                    "被驳回后重新提交同一版本，重新进入审核"
+                    if reuse_rejected
+                    else "提交插件版本，等待管理员审核"
+                ),
             )
         )
         if auto_review:
