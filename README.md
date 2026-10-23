@@ -235,7 +235,7 @@ curl -H "Authorization: Bearer $REGISTRY_TOKEN" \
 - **上传 zip**：包内根目录需有 `manifest.json` 与声明的入口文件
 - **GitHub 仓库**：只接受 tag 或 commit，不接受分支
 
-提交后的规则：
+所有注册用户都可以提交插件。提交后的规则：
 
 1. 插件首次入库需要人工审核
 2. 已有审核通过版本后，新版本自动免审上架

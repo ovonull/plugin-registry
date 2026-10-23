@@ -4,7 +4,7 @@
 功能：
 1. 维护插件身份、版本与审核状态（审核状态机只落在 plugin_versions 上）；
 2. 记录插件在账号上的安装与启用状态，并维护该安装分配到哪些机器人；
-3. 维护可上传代码插件的信任名单；
+3. 维护免审核作者的信任名单（所有注册用户都能提交，名单内提交后免审核）；
 4. 以「只追加」方式记录审核流水与插件动作审计，供事后追责。
 
 设计约定：
@@ -146,7 +146,7 @@ class PluginInstallationBot(Base, IntegerPrimaryKeyMixin, TimestampMixin, SoftDe
 
 
 class PluginTrustedAuthor(Base, IntegerPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin):
-    """信任名单：被授权上传代码插件的用户。"""
+    """信任名单：提交插件版本后免审核直接上架的作者。"""
 
     __tablename__ = "plugin_trusted_authors"
     __table_args__ = (

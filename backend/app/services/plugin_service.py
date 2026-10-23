@@ -5,7 +5,7 @@
 1. 幂等补齐插件系统用到的数据字典项；
 2. 接收上传的插件包或仓库地址，归一化后登记插件与版本记录（初始为待审核）；
 3. 按权限分页查询插件列表与详情，普通用户只能看到已上架插件和自己提交的插件；
-4. 校验代码插件的上传资格：仅管理员与信任名单内的用户可以提交。
+4. 所有注册用户都可以提交插件；管理员与信任名单内的作者提交后免审核直接上架。
 
 说明：审核状态流转、信任名单管理与插件安装启用不在本模块，属于后续阶段。
 """
@@ -43,8 +43,6 @@ logger = logging.getLogger(__name__)
 
 # 插件功能已被关闭
 CODE_PLUGIN_DISABLED = 40380
-# 当前用户不在代码插件信任名单
-CODE_PLUGIN_NOT_TRUSTED = 40381
 # 无权操作他人插件
 CODE_PLUGIN_FORBIDDEN = 40382
 # 插件不存在
@@ -115,20 +113,22 @@ class PluginService:
                 existing.sort_order = order
         await session.commit()
 
-    async def ensure_upload_allowed(
+    async def _is_trusted_author(
         self, session: AsyncSession, user: User
-    ) -> None:
-        """
-        校验当前用户是否具备上传代码插件的资格。
+    ) -> bool:
+        """判断当前用户是否属于「免审核」作者。
+
+        所有注册用户都可以提交插件；差别只在审核：管理员与信任名单内的作者
+        提交的版本免审核直接上架，其余用户提交的版本进入待审核队列。
 
         Args:
             session: 数据库会话。
             user: 当前登录用户。
-        Raises:
-            BusinessError: 既不是管理员也不在信任名单内。
+        Returns:
+            True 表示提交后免审核。
         """
         if is_admin(user):
-            return
+            return True
         trusted = await session.scalar(
             select(PluginTrustedAuthor).where(
                 PluginTrustedAuthor.user_id == user.id,
@@ -136,11 +136,7 @@ class PluginService:
                 PluginTrustedAuthor.is_deleted.is_(False),
             )
         )
-        if trusted is None:
-            raise BusinessError(
-                "当前账号不在代码插件信任名单内，请联系管理员开通上传权限",
-                CODE_PLUGIN_NOT_TRUSTED,
-            )
+        return trusted is not None
 
     async def submit_package(
         self,
@@ -164,9 +160,8 @@ class PluginService:
         Returns:
             新登记的插件与版本信息。
         Raises:
-            BusinessError: 上传资格、来源参数、清单校验或登记任一环节不通过。
+            BusinessError: 来源参数、清单校验或登记任一环节不通过。
         """
-        await self.ensure_upload_allowed(session, user)
         if source_type not in VALID_SOURCE_TYPES:
             raise BusinessError("插件来源只能选择代码仓库或上传压缩包", CODE_PLUGIN_REQUEST_INVALID)
 
@@ -235,10 +230,15 @@ class PluginService:
         plugin = await self._load_or_create_plugin(
             session, user, manifest, source_type, repo_url
         )
-        # 管理员提交视为自审通过：直接批准清单申请的全部能力并上架，
-        # 普通作者仍然走待审核队列，由管理员核对能力声明。
-        auto_review = is_admin(user)
-        auto_comment = "管理员提交，免审直接上架" if auto_review else ""
+        # 管理员与信任名单作者提交视为自审通过：直接批准清单申请的全部能力并上架；
+        # 其余注册用户提交的版本进入待审核队列，由管理员核对能力声明。
+        auto_review = await self._is_trusted_author(session, user)
+        if is_admin(user):
+            auto_comment = "管理员提交，免审直接上架"
+        elif auto_review:
+            auto_comment = "信任作者提交，免审直接上架"
+        else:
+            auto_comment = ""
         version_row = PluginVersion(
             plugin_id=package.plugin_id,
             version=package.version,

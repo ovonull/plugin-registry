@@ -260,7 +260,7 @@ onMounted(() => loadGroup('email'))
           <span class="muted-text">{{ lastSyncAt ? `上次同步：${lastSyncAt}` : '尚未执行过同步' }}</span>
         </div>
         <p class="form-hint">轮询间隔只影响「多久检查一轮」；单轮上限小于插件总数时，每个仓库实际是「间隔 × 轮数」才轮到一次。想立刻拉取刚推的 tag，用上面的「立即同步一次」。</p>
-        <p class="form-hint">审核规则：插件首次入库需人工审核；已有审核通过的版本后，新版本自动免审上架；信任名单作者与管理员免审直接上架；被管理员下架过的插件只免审通过，不会自动重新上架。</p>
+        <p class="form-hint">审核规则：所有注册用户均可提交插件；首次入库需人工审核；已有审核通过的版本后，新版本自动免审上架；信任名单作者与管理员免审直接上架；被管理员下架过的插件只免审通过，不会自动重新上架。</p>
         <div class="form-actions"><button class="button primary" type="submit" :disabled="saving"><span v-if="saving" class="button-spinner" /><Save :size="16" />保存同步设置</button></div>
       </form>
       <LoadingOverlay :visible="loading" contained />

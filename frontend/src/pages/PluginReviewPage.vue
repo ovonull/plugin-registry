@@ -79,11 +79,14 @@ function capabilityName(code: string) {
 }
 
 function capabilityRisk(code: string) {
-  return catalog.value[code]?.risk_level || 'low'
+  // 本地能力目录里没有的，标成「未知风险」，不当作高风险处理。
+  return catalog.value[code]?.risk_level || 'unknown'
 }
 
 function riskLabel(code: string) {
-  return labelOf(riskNames.value, capabilityRisk(code))
+  const risk = capabilityRisk(code)
+  if (risk === 'unknown') return '未知风险'
+  return labelOf(riskNames.value, risk)
 }
 
 async function loadDictionaries() {
@@ -453,7 +456,7 @@ onMounted(async () => {
       </section>
 
       <section class="content-panel">
-        <div class="panel-heading"><div><h2><ShieldCheck :size="17" />代码插件信任名单</h2><p>共 {{ trustResult.total }} 条授权，仅名单内用户可提交真实代码插件</p></div><div class="panel-heading-actions"><button type="button" class="button primary" @click="openGrant"><UserPlus :size="16" />新增授权</button></div></div>
+        <div class="panel-heading"><div><h2><ShieldCheck :size="17" />代码插件信任名单</h2><p>共 {{ trustResult.total }} 条授权；名单内用户提交免审核，其他注册用户提交后进入审核队列</p></div><div class="panel-heading-actions"><button type="button" class="button primary" @click="openGrant"><UserPlus :size="16" />新增授权</button></div></div>
         <div class="table-scroll plugin-review-table">
           <table>
             <thead><tr><th>用户</th><th>授权人</th><th>授权原因</th><th>状态</th><th>授权时间</th><th class="action-column">操作</th></tr></thead>
@@ -468,7 +471,7 @@ onMounted(async () => {
               </tr>
             </tbody>
           </table>
-          <EmptyState v-if="!loading && !trustResult.items.length" text="信任名单为空，暂时没有人可以提交代码插件" />
+          <EmptyState v-if="!loading && !trustResult.items.length" text="信任名单为空，所有用户提交的插件都需要审核" />
         </div>
         <div class="pagination"><span>第 {{ trustResult.page }} / {{ trustResult.pages }} 页，共 {{ trustResult.total }} 条</span><div><select v-model.number="trustQuery.page_size" title="每页条数" @change="trustQuery.page = 1; loadTrust()"><option :value="10">10 条/页</option><option :value="20">20 条/页</option><option :value="50">50 条/页</option><option :value="100">100 条/页</option></select><button type="button" class="page-button" :disabled="trustResult.page <= 1" @click="changePage('trust', trustResult.page - 1)">上一页</button><button type="button" class="page-button" :disabled="trustResult.page >= trustResult.pages" @click="changePage('trust', trustResult.page + 1)">下一页</button></div></div>
       </section>
@@ -504,7 +507,7 @@ onMounted(async () => {
 
     <BaseModal :open="grantOpen" title="新增信任授权" @close="grantOpen = false">
       <form class="plugin-config-form" @submit.prevent="submitGrant">
-        <p class="plugin-config-hint">加入信任名单后，该用户可以提交真实代码插件；代码插件运行时仍受能力清单与隔离执行约束。</p>
+        <p class="plugin-config-hint">加入信任名单后，该用户提交的插件版本免审核直接上架；代码插件运行时仍受能力清单与隔离执行约束。</p>
         <label><span class="field-label">选择用户<span class="required">*</span></span><select v-model="grantUserId" required><option value="" disabled>请选择用户</option><option v-for="user in users" :key="user.id" :value="user.id">{{ user.username }} · ID {{ user.id }}</option></select><small>仅列出前 100 个用户，如需授权更多用户请先按用户名搜索用户管理页。</small></label>
         <label><span class="field-label">授权原因</span><input v-model="grantReason" maxlength="255" placeholder="例如：官方插件作者，已完成实名与代码约定" /></label>
         <div class="modal-form-actions"><button type="button" class="button secondary" :disabled="saving" @click="grantOpen = false">取消</button><button class="button primary" type="submit" :disabled="saving"><span v-if="saving" class="button-spinner" /><UserPlus :size="16" />确认授权</button></div>

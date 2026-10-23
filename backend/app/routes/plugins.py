@@ -118,8 +118,7 @@ async def probe_repo_latest(
     """探测仓库最新版本：返回插件标识、版本号与引用来源，不登记、不落库。"""
     service = _plugin_service(request)
     service.ensure_enabled(request.app.state.container.settings)
-    user = await get_current_user(request, session)
-    await service.ensure_upload_allowed(session, user)
+    await get_current_user(request, session)
     data = await service.probe_repo_latest(payload.repo_url, payload.source_ref)
     return success(data, "已探测到仓库最新版本")
 
