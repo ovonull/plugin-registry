@@ -519,6 +519,46 @@ class PluginSourceService:
         """返回已存档的原始压缩包路径，不存在时返回不存在的路径由调用方判断。"""
         return self.archive_dir() / plugin_id / f"{version}.zip"
 
+    def prune_version_packages(
+        self, plugin_id: str, version: str, keep_checksum: str
+    ) -> list[str]:
+        """删除同一版本下其它校验和的解包目录。
+
+        被驳回后重新上传时，zip 字节可能变了、checksum 随之变化，旧的解包目录
+        不会再被任何版本记录引用；留着只占空间，这里顺手清掉。
+
+        Args:
+            plugin_id: 插件标识。
+            version: 版本号。
+            keep_checksum: 本次提交的校验和，保留它的前 12 位目录。
+        Returns:
+            实际删除的目录路径列表。
+        """
+        key = str(plugin_id or "").strip()
+        ver = str(version or "").strip()
+        if not key or not ver or "/" in key or "\\" in key or "/" in ver or "\\" in ver:
+            return []
+        version_dir = self.data_root / "packages" / key / ver
+        if not version_dir.is_dir():
+            return []
+        keep = str(keep_checksum or "").strip()[:12]
+        removed: list[str] = []
+        for child in version_dir.iterdir():
+            if not child.is_dir() or child.name == keep:
+                continue
+            try:
+                shutil.rmtree(child)
+            except OSError as error:
+                logger.warning(
+                    "旧解包目录清理失败，目录=%s，错误类型=%s，错误=%s",
+                    child,
+                    type(error).__name__,
+                    error,
+                )
+                continue
+            removed.append(str(child))
+        return removed
+
     def prepare_package(self, content: bytes) -> ExtractedPackage:
         """
         校验压缩包并归一化落盘。

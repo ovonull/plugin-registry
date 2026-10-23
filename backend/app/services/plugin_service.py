@@ -222,6 +222,11 @@ class PluginService:
             existing_version is not None
             and existing_version.review_status == REVIEW_STATUS_REJECTED
         )
+        if reuse_rejected:
+            # 重新打包后 checksum 可能变了，清掉同版本下不再被引用的旧解包目录。
+            self.source_service.prune_version_packages(
+                package.plugin_id, package.version, package.checksum
+            )
         if existing_version is not None and not reuse_rejected:
             hint = "请修改清单中的版本号后重新上传"
             if source_type == SOURCE_TYPE_REPO and not str(source_ref or "").strip():
