@@ -187,50 +187,67 @@ async function savePassword() {
       </form>
     </section>
 
-    <section v-else-if="activeTab === 'token'" class="content-panel settings-module">
-      <div class="panel-heading">
-        <div><h2><KeySquare :size="18" />接入令牌</h2><p>下游程序靠这里的令牌调用插件库分发接口，每个账号只看得到自己创建的令牌。</p></div>
-        <button type="button" class="button primary" @click="openTokenModal"><Plus :size="16" />创建令牌</button>
-      </div>
+    <div v-else-if="activeTab === 'token'" class="token-stack">
+      <!-- 卡片一：服务地址。根地址与 QQ 框架「插件库对接」里填的格式一致 -->
+      <section class="content-panel settings-module">
+        <div class="panel-heading">
+          <div><h2><Link2 :size="18" />服务地址</h2><p>下游程序接入插件库分发接口要用的地址，复制过去即可。</p></div>
+        </div>
+        <div class="panel-body">
+          <div class="api-endpoint">
+            <div class="api-endpoint-row">
+              <span class="api-endpoint-label"><Link2 :size="14" />插件库地址</span>
+              <code>{{ apiBase }}</code>
+              <button type="button" class="api-endpoint-copy" title="复制插件库地址" @click="copyText(apiBase, '插件库地址已复制')"><Copy :size="15" /></button>
+            </div>
+            <div class="api-endpoint-row">
+              <span class="api-endpoint-label">API 调用地址</span>
+              <code>{{ apiIndexUrl }}</code>
+              <button type="button" class="api-endpoint-copy" title="复制调用地址" @click="copyText(apiIndexUrl, '调用地址已复制')"><Copy :size="15" /></button>
+            </div>
+            <div class="api-endpoint-row">
+              <span class="api-endpoint-label">插件包地址</span>
+              <code>{{ apiPackageUrl }}</code>
+              <button type="button" class="api-endpoint-copy" title="复制插件包地址" @click="copyText(apiPackageUrl, '插件包地址已复制')"><Copy :size="15" /></button>
+            </div>
+          </div>
+          <p class="form-hint">
+            「插件库地址」就是根地址，机器人框架「系统设置 → 插件库对接」里填的就是它。地址取自服务端配置；
+            若站点外面还挂了域名或反向代理，在部署的 <code>.env</code> 里设置 <code>PUBLIC_SERVICE_URL</code>，这三个地址会跟着变。
+          </p>
+        </div>
+      </section>
 
-      <div class="api-endpoint">
-        <div class="api-endpoint-row">
-          <span class="api-endpoint-label"><Link2 :size="14" />API 调用地址</span>
-          <code>{{ apiIndexUrl }}</code>
-          <button type="button" class="api-endpoint-copy" title="复制调用地址" @click="copyText(apiIndexUrl, '调用地址已复制')"><Copy :size="15" /></button>
+      <!-- 卡片二：接入令牌 -->
+      <section class="content-panel settings-module">
+        <div class="panel-heading">
+          <div><h2><KeySquare :size="18" />接入令牌</h2><p>每个账号只看得到自己创建的令牌，明文只在创建时显示一次。</p></div>
+          <button type="button" class="button primary" @click="openTokenModal"><Plus :size="16" />创建令牌</button>
         </div>
-        <div class="api-endpoint-row">
-          <span class="api-endpoint-label">插件包地址</span>
-          <code>{{ apiPackageUrl }}</code>
-          <button type="button" class="api-endpoint-copy" title="复制插件包地址" @click="copyText(apiPackageUrl, '插件包地址已复制')"><Copy :size="15" /></button>
+        <div class="panel-body">
+          <div class="token-table">
+            <div class="token-table-head">
+              <span>名称</span><span>Key</span><span>创建时间</span><span>最后使用</span><span>操作</span>
+            </div>
+            <div v-for="item in tokens" :key="item.id" class="token-table-row">
+              <span class="token-name">{{ item.name || '未命名令牌' }}</span>
+              <code>{{ item.prefix }}</code>
+              <span>{{ formatTokenTime(item.created_at) }}</span>
+              <span :class="{ 'token-idle': !item.last_used_at }">{{ item.last_used_at ? formatTokenTime(item.last_used_at) : '从未使用' }}</span>
+              <button type="button" class="token-revoke" title="吊销令牌" @click="revokeToken(item)">
+                <Trash2 :size="15" />
+              </button>
+            </div>
+            <p v-if="tokensLoading" class="token-empty">加载中…</p>
+            <p v-else-if="!tokens.length" class="token-empty">还没有令牌，点右上角创建一枚。</p>
+          </div>
+          <p class="form-hint">
+            请求时带上 <code>Authorization: Bearer &lt;令牌&gt;</code> 或 <code>X-Registry-Token</code> 请求头。
+            明文只在创建时显示一次，库里只保存摘要；泄露了就吊销重新创建。
+          </p>
         </div>
-      </div>
-
-      <div class="token-table">
-        <div class="token-table-head">
-          <span>名称</span><span>Key</span><span>创建时间</span><span>最后使用</span><span>操作</span>
-        </div>
-        <div v-for="item in tokens" :key="item.id" class="token-table-row">
-          <span class="token-name">{{ item.name || '未命名令牌' }}</span>
-          <code>{{ item.prefix }}</code>
-          <span>{{ formatTokenTime(item.created_at) }}</span>
-          <span :class="{ 'token-idle': !item.last_used_at }">{{ item.last_used_at ? formatTokenTime(item.last_used_at) : '从未使用' }}</span>
-          <button type="button" class="token-revoke" title="吊销令牌" @click="revokeToken(item)">
-            <Trash2 :size="15" />
-          </button>
-        </div>
-        <p v-if="tokensLoading" class="token-empty">加载中…</p>
-        <p v-else-if="!tokens.length" class="token-empty">还没有令牌，点右上角创建一枚。</p>
-      </div>
-
-      <p class="form-hint">
-        请求时带上 <code>Authorization: Bearer &lt;令牌&gt;</code> 或 <code>X-Registry-Token</code> 请求头。
-        明文只在创建时显示一次，库里只保存摘要；泄露了就吊销重新创建。
-      </p>
-      <p class="form-hint">
-        地址取自服务端配置；若站点外面还挂了域名或反向代理，在部署的 <code>.env</code> 里设置 <code>PUBLIC_SERVICE_URL</code>，这两个地址会跟着变。
-      </p>
-    </section>
+      </section>
+    </div>
 
     <section v-else class="content-panel settings-module">
       <div class="panel-heading"><div><h2><KeyRound :size="18" />修改密码</h2><p>修改成功后会撤销全部登录会话。</p></div></div>

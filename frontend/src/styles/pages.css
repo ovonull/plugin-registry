@@ -304,6 +304,11 @@
   text-align: center;
 }
 
+/* 「接入令牌」页签：服务地址与令牌列表拆成两张独立卡片，中间留缝（对齐控制台分卡风格） */
+.token-stack { display: grid; gap: 17px; max-width: 920px; }
+.token-stack .panel-body { display: grid; gap: 14px; padding: 16px 19px; }
+.token-stack .api-endpoint { margin-bottom: 0; }
+
 /* 「接入令牌」页签顶部的 API 调用地址：把下游要填的地址直接摆出来，配一键复制 */
 .api-endpoint {
   display: grid;
@@ -361,6 +366,8 @@
 }
 
 @media (max-width: 760px) {
+  .token-stack { gap: 13px; }
+  .token-stack .panel-body { padding: 14px 16px; }
   .token-table-head { display: none; }
   .token-table-row { grid-template-columns: 1fr auto; row-gap: 6px; }
   .token-table-row > span:nth-child(3),
