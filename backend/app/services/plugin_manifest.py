@@ -3,20 +3,21 @@
 
 功能：
 1. 对提交的清单做严格字段校验，出现未知字段直接拒收，避免夹带未审内容；
-2. 校验能力声明必须全部落在 plugin_capability 白名单内；
+2. 校验能力声明的结构（非空、不重复）；不校验是否在本地白名单内——
+   宿主由外部维护、能力会持续扩展，未登记的能力放行并记日志；
 3. 校验入口文件、依赖声明与配置项结构，输出可直接入库的归一化清单；
 4. 出网域名白名单与能力批准的判断复用 plugin_gate，保证审核与运行期依据一致。
 """
 
+import logging
 import re
 from typing import Any
 
 from app.common.responses import BusinessError
-from app.services.plugin_capability import (
-    CAPABILITY_CODE_SET,
-    CAPABILITY_CODES,
-)
+from app.services.plugin_capability import CAPABILITY_CODE_SET
 from app.services.plugin_gate import validate_allowed_domains
+
+logger = logging.getLogger("uvicorn.error")
 
 
 MANIFEST_VERSION = 1
@@ -253,7 +254,12 @@ def _validate_author(payload: dict[str, Any]) -> dict[str, str]:
 
 
 def _validate_capabilities(payload: dict[str, Any]) -> list[str]:
-    """校验能力声明：必须是非空数组、取值全部在白名单内且不重复。"""
+    """校验能力声明：非空数组、每项非空文本、不重复。
+
+    **不校验是否在本地白名单内**。插件库只负责分发，能力是否可用由宿主决定；
+    宿主是外部在改的，能力会持续扩展，这里硬卡只会把新能力挡在门外。
+    本地未登记的能力按原样放行，只记一条日志，方便发现清单笔误。
+    """
     value = payload.get("capabilities")
     if not isinstance(value, list) or not value:
         _raise("插件清单「能力声明」必须是非空数组", CODE_CAPABILITY_INVALID)
@@ -263,11 +269,7 @@ def _validate_capabilities(payload: dict[str, Any]) -> list[str]:
             _raise("插件清单「能力声明」的每一项都必须是非空文本", CODE_CAPABILITY_INVALID)
         code = item.strip()
         if code not in CAPABILITY_CODE_SET:
-            _raise(
-                f"插件清单申请了未开放的能力：{code}，可选能力为："
-                + "、".join(CAPABILITY_CODES),
-                CODE_CAPABILITY_INVALID,
-            )
+            logger.warning("插件清单声明了本地未登记的能力，按原样放行：%s", code)
         if code in declared:
             _raise(f"插件清单「能力声明」重复出现：{code}", CODE_CAPABILITY_INVALID)
         declared.append(code)
