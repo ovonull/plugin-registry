@@ -83,7 +83,7 @@ FIELD_LABELS: dict[str, str] = {
 
 ALLOWED_AUTHOR_FIELDS: frozenset[str] = frozenset({"name", "url"})
 ALLOWED_CONFIG_FIELDS: frozenset[str] = frozenset(
-    {"key", "label", "type", "required", "sensitive", "options"}
+    {"key", "label", "type", "required", "sensitive", "options", "default"}
 )
 
 PLUGIN_ID_PATTERN = re.compile(r"^[a-z0-9][a-z0-9._-]{2,99}$")
@@ -302,6 +302,33 @@ def _validate_dependencies(payload: dict[str, Any]) -> list[str]:
     return dependencies
 
 
+def _normalize_default(
+    key: str, item_type: str, value: Any, options: list[str]
+) -> Any:
+    """把配置项的默认值收敛成与类型匹配的标量，非法时退回「无默认值」。
+
+    面板用它预填输入框；没有默认值时前端留空，由插件自己的兜底逻辑决定实际行为。
+    """
+    if value is None:
+        return None
+    if item_type == "switch":
+        return (
+            bool(value)
+            if isinstance(value, bool)
+            else str(value).strip().lower() in {"1", "true", "yes", "on"}
+        )
+    if item_type == "number":
+        try:
+            return int(float(str(value).strip()))
+        except (TypeError, ValueError):
+            return None
+    text = str(value).strip()
+    if item_type == "select":
+        # 默认值必须是可选项之一，否则用户一打开面板就是非法状态。
+        return text if text in options else None
+    return text[:5000] if text else None
+
+
 def _validate_config_schema(payload: dict[str, Any]) -> list[dict[str, Any]]:
     """校验配置项定义，保证 key 唯一且类型在白名单内。"""
     value = payload.get("config_schema")
@@ -362,6 +389,7 @@ def _validate_config_schema(payload: dict[str, Any]) -> list[dict[str, Any]]:
                 "required": bool(raw.get("required", False)),
                 "sensitive": bool(raw.get("sensitive", False)),
                 "options": options,
+                "default": _normalize_default(key, item_type, raw.get("default"), options),
             }
         )
     return items
