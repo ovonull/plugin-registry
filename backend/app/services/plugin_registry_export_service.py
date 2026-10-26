@@ -361,8 +361,56 @@ class RegistryExportService:
                 version.capabilities_json
             )
             entry["entry"] = version.entry or ""
+            # 版本历史随详情一起下发，下游市场直接渲染版本记录，不用再单开接口。
+            entry["versions"] = await self._version_history(session, plugin, version)
             return entry
         return None
+
+    async def _version_history(
+        self, session: AsyncSession, plugin: Plugin, current: PluginVersion
+    ) -> list[dict[str, Any]]:
+        """列出该插件已通过审核的历史版本，新到旧。
+
+        只公开 approved：pending / rejected 属于审核流程内部状态，对外没有意义，
+        而且被拒绝的包内容可能有问题，不该出现在公开页面上。历史版本不提供下载
+        （``package_url`` 留空），分发只走当前上架版本。
+        """
+        rows = (
+            await session.scalars(
+                select(PluginVersion)
+                .where(
+                    PluginVersion.plugin_id == plugin.plugin_id,
+                    PluginVersion.review_status == "approved",
+                    PluginVersion.is_deleted.is_(False),
+                )
+                .order_by(PluginVersion.id.desc())
+            )
+        ).all()
+        history: list[dict[str, Any]] = []
+        for row in rows:
+            payload = self._version_payload(plugin, row)
+            payload.update(
+                {
+                    "id": row.id,
+                    "granted_capabilities": self._parse_list(
+                        row.granted_capabilities_json
+                    ),
+                    "requested_capabilities": self._parse_list(
+                        row.capabilities_json
+                    ),
+                    "entry": row.entry or "",
+                    "review_status": row.review_status,
+                    "reviewed_at": self._iso(row.reviewed_at),
+                    "submitted_at": self._iso(row.created_at),
+                    # 下游据此把当前上架版本和纯历史版本区分开。
+                    "is_current": row.id == current.id,
+                    "changelog": str(
+                        self._parse_manifest(row.manifest_json).get("changelog") or ""
+                    ),
+                }
+            )
+            history.append(payload)
+        return history
 
     async def build_stats(self, session: AsyncSession) -> dict[str, Any]:
         """首页顶部统计：插件数、安装数、作者数。"""
