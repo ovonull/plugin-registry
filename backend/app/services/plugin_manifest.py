@@ -2,7 +2,7 @@
 插件清单（manifest）严格校验。
 
 功能：
-1. 对提交的清单做严格字段校验，出现未知字段直接拒收，避免夹带未审内容；
+1. 对提交的清单做字段校验，允许未知字段并原样保留（向后兼容），必填与格式校验照常；
 2. 校验能力声明的结构（非空、不重复）；不校验是否在本地白名单内——
    宿主由外部维护、能力会持续扩展，未登记的能力放行并记日志；
 3. 校验入口文件、依赖声明与配置项结构，输出可直接入库的归一化清单；
@@ -224,12 +224,8 @@ def _validate_author(payload: dict[str, Any]) -> dict[str, str]:
     value = payload.get("author")
     if not isinstance(value, dict):
         _raise("插件清单字段「作者信息」必须是包含 name 的对象", CODE_MANIFEST_INVALID)
-    unknown = sorted(set(value) - ALLOWED_AUTHOR_FIELDS)
-    if unknown:
-        _raise(
-            "插件清单「作者信息」存在不支持的字段：" + "、".join(unknown),
-            CODE_MANIFEST_INVALID,
-        )
+    # 放开作者信息子字段白名单：未知子字段不再报错，原样保留。
+    extra_author_fields = {k: v for k, v in value.items() if k not in ALLOWED_AUTHOR_FIELDS}
     raw_name = value.get("name")
     if not isinstance(raw_name, str) or not raw_name.strip():
         _raise("插件清单「作者信息」缺少必填字段：作者名称", CODE_MANIFEST_INVALID)
@@ -250,7 +246,9 @@ def _validate_author(payload: dict[str, Any]) -> dict[str, str]:
         )
     if url:
         _require_web_url(url, "作者主页")
-    return {"name": name, "url": url}
+    author_info: dict[str, Any] = {"name": name, "url": url}
+    author_info.update(extra_author_fields)
+    return author_info
 
 
 def _validate_capabilities(payload: dict[str, Any]) -> list[str]:
@@ -346,12 +344,8 @@ def _validate_config_schema(payload: dict[str, Any]) -> list[dict[str, Any]]:
     for raw in value:
         if not isinstance(raw, dict):
             _raise("插件清单「配置项定义」的每一项都必须是对象", CODE_MANIFEST_INVALID)
-        unknown = sorted(set(raw) - ALLOWED_CONFIG_FIELDS)
-        if unknown:
-            _raise(
-                "配置项存在不支持的字段：" + "、".join(unknown),
-                CODE_MANIFEST_INVALID,
-            )
+        # 放开配置项子字段白名单：未知子字段不再报错，原样保留。
+        extra_config_fields = {k: v for k, v in raw.items() if k not in ALLOWED_CONFIG_FIELDS}
         key = raw.get("key")
         if not isinstance(key, str) or not CONFIG_KEY_PATTERN.match(key.strip()):
             _raise(
@@ -381,17 +375,17 @@ def _validate_config_schema(payload: dict[str, Any]) -> list[dict[str, Any]]:
                 _raise(f"下拉型配置项 {key} 必须提供可选项", CODE_MANIFEST_INVALID)
         else:
             options = []
-        items.append(
-            {
-                "key": key,
-                "label": label.strip()[:100],
-                "type": item_type,
-                "required": bool(raw.get("required", False)),
-                "sensitive": bool(raw.get("sensitive", False)),
-                "options": options,
-                "default": _normalize_default(key, item_type, raw.get("default"), options),
-            }
-        )
+        item: dict[str, Any] = {
+            "key": key,
+            "label": label.strip()[:100],
+            "type": item_type,
+            "required": bool(raw.get("required", False)),
+            "sensitive": bool(raw.get("sensitive", False)),
+            "options": options,
+            "default": _normalize_default(key, item_type, raw.get("default"), options),
+        }
+        item.update(extra_config_fields)
+        items.append(item)
     return items
 
 
@@ -402,19 +396,16 @@ def normalize_manifest(payload: Any) -> dict[str, Any]:
     Args:
         payload: 提交上来的清单原始内容，必须是 JSON 对象。
     Returns:
-        归一化后的清单，包含全部 16 个字段，缺省字段以空值或空数组补齐。
+        归一化后的清单，包含全部已知字段，缺省字段以空值或空数组补齐；
+        清单中的未知字段原样保留，向后兼容。
     Raises:
-        BusinessError: 清单缺字段、含未知字段或任一取值不合法。
+        BusinessError: 清单缺必填字段或任一取值不合法。
     """
     if not isinstance(payload, dict):
         _raise("插件清单必须是 JSON 对象", CODE_MANIFEST_INVALID)
 
-    unknown = sorted(set(payload) - ALLOWED_FIELDS)
-    if unknown:
-        _raise(
-            "插件清单存在不支持的字段：" + "、".join(unknown),
-            CODE_MANIFEST_INVALID,
-        )
+    # 放开字段白名单：不再因未知顶层字段报错，未知字段原样保留以向后兼容。
+    extra_fields = {k: v for k, v in payload.items() if k not in ALLOWED_FIELDS}
 
     manifest_version = payload.get("manifest_version")
     if manifest_version != MANIFEST_VERSION:
@@ -447,7 +438,7 @@ def normalize_manifest(payload: Any) -> dict[str, Any]:
     dependencies = _validate_dependencies(payload)
     config_schema = _validate_config_schema(payload)
 
-    return {
+    result: dict[str, Any] = {
         "manifest_version": MANIFEST_VERSION,
         "id": plugin_id,
         "name": name,
@@ -465,4 +456,6 @@ def normalize_manifest(payload: Any) -> dict[str, Any]:
         "dependencies": dependencies,
         "config_schema": config_schema,
     }
+    result.update(extra_fields)
+    return result
 

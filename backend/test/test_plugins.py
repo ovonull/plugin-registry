@@ -106,14 +106,12 @@ def test_normalize_manifest_fills_all_fields() -> None:
     }
 
 
-def test_normalize_manifest_rejects_unknown_field() -> None:
-    """清单出现未知字段时直接拒收，避免夹带未审内容。"""
-    payload = dict(VALID_MANIFEST, hidden_backdoor="true")
-    with pytest.raises(BusinessError) as error:
-        normalize_manifest(payload)
-    assert error.value.code == 40090
-    assert "不支持的字段" in error.value.message
-    assert "hidden_backdoor" in error.value.message
+def test_normalize_manifest_keeps_unknown_field() -> None:
+    """放开字段白名单后，未知字段不再拒收，而是原样保留。"""
+    payload = dict(VALID_MANIFEST, http_endpoints=[{"path": "/hook"}])
+    normalized = normalize_manifest(payload)
+    assert "http_endpoints" in normalized
+    assert normalized["http_endpoints"] == [{"path": "/hook"}]
 
 
 def test_normalize_manifest_rejects_bad_version_and_plugin_id() -> None:
