@@ -211,10 +211,6 @@ async function savePassword() {
               <button type="button" class="api-endpoint-copy" title="复制插件包地址" @click="copyText(apiPackageUrl, '插件包地址已复制')"><Copy :size="15" /></button>
             </div>
           </div>
-          <p class="form-hint">
-            「插件库地址」就是根地址，机器人框架「系统设置 → 插件库对接」里填的就是它。地址取自服务端配置；
-            若站点外面还挂了域名或反向代理，在部署的 <code>.env</code> 里设置 <code>PUBLIC_SERVICE_URL</code>，这三个地址会跟着变。
-          </p>
         </div>
       </section>
 
