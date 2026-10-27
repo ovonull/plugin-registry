@@ -71,6 +71,7 @@ from app.services.plugin_runtime import build_plugin_runtime
 from app.services.plugin_service import PluginService
 from app.services.plugin_trust_service import PluginTrustService
 from app.services.setting_service import SettingService
+from app.services.user_admin_service import UserAdminService
 from app.services.user_service import UserService
 from app.services.welcome_message_service import WelcomeMessageService
 from app.services.scheduled_task_service import ScheduledTaskService
@@ -87,6 +88,7 @@ class ServiceContainer:
     database: Database
     geetest_service: GeetestService
     user_service: UserService
+    user_admin_service: UserAdminService
     auto_reply_service: AutoReplyService
     bot_service: BotService
     bot_ai_service: BotAiService
@@ -184,6 +186,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         user_service = UserService(
             app_settings, geetest_service, login_log_service, email_log_service
         )
+        user_admin_service = UserAdminService()
         auto_reply_service = AutoReplyService()
         bot_service = BotService()
         bot_ai_service = BotAiService(bot_service, database.session_factory)
@@ -259,6 +262,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             database,
             geetest_service,
             user_service,
+            user_admin_service,
             auto_reply_service,
             bot_service,
             bot_ai_service,

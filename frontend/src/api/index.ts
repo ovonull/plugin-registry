@@ -41,6 +41,7 @@ import type {
   GithubSettings,
   ManagedUser,
   CreateUserPayload,
+  UpdateUserPayload,
   GeetestResult,
   LoginPayload,
   LoginLogRecord,
@@ -64,6 +65,7 @@ import type {
   PluginRepoProbeResult,
   PluginRepoSubmitPayload,
   PluginReviewLog,
+  PluginActionLogRecord,
   PluginReviewVersion,
   PluginTrustedAuthor,
   PluginUpgradeResult,
@@ -123,10 +125,21 @@ export const profileApi = {
 }
 
 export const userApi = {
-  list: (params: { page: number; page_size: number }) =>
-    request<Pagination<ManagedUser>>({ url: '/users', params }),
+  list: (params: {
+    page: number
+    page_size: number
+    keyword?: string
+    role_code?: string
+    is_active?: boolean
+  }) => request<Pagination<ManagedUser>>({ url: '/users', params }),
   create: (payload: CreateUserPayload) =>
     request<ManagedUser>({ url: '/users', method: 'POST', data: payload }),
+  update: (id: number, payload: UpdateUserPayload) =>
+    request<ManagedUser>({ url: `/users/${id}`, method: 'PUT', data: payload }),
+  resetPassword: (id: number, newPassword: string) =>
+    request({ url: `/users/${id}/reset-password`, method: 'POST', data: { new_password: newPassword } }),
+  remove: (id: number) =>
+    request({ url: `/users/${id}`, method: 'DELETE' }),
 }
 
 export interface LoginLogQuery {
@@ -590,6 +603,17 @@ export const pluginAdminApi = {
     }),
   revokeTrust: (id: number) =>
     request({ url: `/plugin_admin/trusted-authors/${id}/revoke`, method: 'POST' }),
+  // 插件动作审计：只读，记录由插件网关追加写入。
+  actionLogs: (params: {
+    page: number
+    page_size: number
+    plugin_id?: string
+    bot_qq?: string
+    result_code?: string
+    keyword?: string
+  }) => request<Pagination<PluginActionLogRecord>>({
+    url: '/plugin_admin/action-logs', params,
+  }),
   // 仓库来源插件自动同步：定时任务之外的手动触发入口。
   syncRepos: () =>
     request<{

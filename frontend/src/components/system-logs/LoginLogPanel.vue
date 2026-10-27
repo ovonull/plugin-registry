@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { Filter, History, RefreshCw, Search } from 'lucide-vue-next'
-import { loginLogApi, publicApi } from '../api'
-import type { DictionaryOption, LoginLogRecord, Pagination } from '../types'
-import EmptyState from '../components/common/EmptyState.vue'
-import LoadingOverlay from '../components/common/LoadingOverlay.vue'
-import { useAuth } from '../composables/useAuth'
-import { useToast } from '../composables/useToast'
+import { loginLogApi, publicApi } from '../../api'
+import type { DictionaryOption, LoginLogRecord, Pagination } from '../../types'
+import EmptyState from '../common/EmptyState.vue'
+import LoadingOverlay from '../common/LoadingOverlay.vue'
+import { useAuth } from '../../composables/useAuth'
+import { useToast } from '../../composables/useToast'
 
 const auth = useAuth()
 const toast = useToast()
@@ -93,18 +93,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="page-enter login-log-page">
-    <div class="page-heading">
-      <div>
-        <p class="eyebrow">LOGIN LOGS</p>
-        <h1>登录日志</h1>
-        <p>{{ isAdmin ? '查看全部用户的登录记录，包含登录成功与失败的明细。' : '查看本人的登录记录，包含登录成功与失败的明细。' }}</p>
-      </div>
-      <button type="button" class="button secondary" title="刷新登录日志" :disabled="loading" @click="loadLogs">
-        <RefreshCw :size="17" :class="{ spin: loading }" />刷新
-      </button>
-    </div>
-
+  <div class="login-log-panel">
     <section class="filter-panel">
       <div class="filter-title"><Filter :size="17" /><strong>筛选条件</strong></div>
       <div class="filter-fields">

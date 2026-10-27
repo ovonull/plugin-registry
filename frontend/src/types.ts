@@ -36,6 +36,14 @@ export interface CreateUserPayload {
   password: string
 }
 
+/** 管理员修改用户时提交的字段，未填写的字段不会提交。 */
+export interface UpdateUserPayload {
+  nickname?: string
+  email?: string | null
+  role_code?: 'admin' | 'user'
+  is_active?: boolean
+}
+
 export interface LoginLogRecord {
   id: number
   owner_id: number | null
@@ -59,6 +67,24 @@ export interface EmailLogRecord {
   is_success: boolean
   client_ip: string | null
   result_message: string | null
+  created_at: string
+}
+
+/** 插件动作审计记录，由插件网关写入，只追加不可修改。 */
+export interface PluginActionLogRecord {
+  id: number
+  plugin_id: string
+  version_id: number | null
+  owner_id: number | null
+  bot_qq: string
+  group_id: string
+  user_id: string
+  action_name: string
+  capability: string
+  params: string
+  result_code: string
+  result_message: string
+  duration_ms: number
   created_at: string
 }
 

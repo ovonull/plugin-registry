@@ -4,7 +4,7 @@ from datetime import timedelta
 import logging
 import secrets
 
-from sqlalchemy import func, or_, select, update
+from sqlalchemy import or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -20,7 +20,6 @@ from app.common.security import (
 from app.common.time_utils import beijing_now, format_beijing
 from app.models.entities import AuthSession, DataDictionary, User
 from app.schemas import (
-    AdminUserCreateRequest,
     EmailBindRequest,
     LoginRequest,
     PasswordUpdateRequest,
@@ -128,78 +127,6 @@ class UserService:
             await session.rollback()
             raise BusinessError("用户名或邮箱已存在", 40010) from exc
         return await self._create_login_session(session, user)
-
-    async def list_users(
-        self, session: AsyncSession, page: int = 1, page_size: int = 20
-    ) -> dict:
-        """分页查询未删除用户，供管理员后台查看。"""
-        conditions = (User.is_deleted.is_(False),)
-        total = int(await session.scalar(select(func.count(User.id)).where(*conditions)) or 0)
-        rows = (
-            await session.scalars(
-                select(User)
-                .where(*conditions)
-                .order_by(User.id.desc())
-                .offset((page - 1) * page_size)
-                .limit(page_size)
-            )
-        ).all()
-        role_rows = (
-            await session.execute(
-                select(DataDictionary.item_code, DataDictionary.item_name).where(
-                    DataDictionary.dict_type == "user_role",
-                    DataDictionary.is_deleted.is_(False),
-                )
-            )
-        ).all()
-        role_names = {code: name for code, name in role_rows}
-        return {
-            "items": [self.serialize_admin_user(user, role_names) for user in rows],
-            "page": page,
-            "page_size": page_size,
-            "total": total,
-            "pages": max(1, (total + page_size - 1) // page_size),
-        }
-
-    async def create_user(
-        self, session: AsyncSession, payload: AdminUserCreateRequest
-    ) -> dict:
-        """由管理员创建普通用户，不要求邮箱验证码或极验。"""
-        email = str(payload.email).lower() if payload.email else None
-        duplicate_conditions = [User.username == payload.username]
-        if email:
-            duplicate_conditions.append(User.email == email)
-        existing = await session.scalar(
-            select(User).where(or_(*duplicate_conditions))
-        )
-        if existing is not None:
-            if existing.username == payload.username:
-                raise BusinessError("用户名已存在", 40010)
-            raise BusinessError("邮箱已注册", 40010)
-
-        user = User(
-            username=payload.username,
-            email=email,
-            nickname=(payload.nickname or payload.username).strip(),
-            password_hash=hash_password(payload.password),
-            role_code=ROLE_USER,
-            is_active=True,
-        )
-        session.add(user)
-        try:
-            await session.flush()
-            await session.commit()
-        except IntegrityError as exc:
-            await session.rollback()
-            raise BusinessError("用户名或邮箱已存在", 40010) from exc
-        role_name = await session.scalar(
-            select(DataDictionary.item_name).where(
-                DataDictionary.dict_type == "user_role",
-                DataDictionary.item_code == ROLE_USER,
-                DataDictionary.is_deleted.is_(False),
-            )
-        )
-        return self.serialize_admin_user(user, {ROLE_USER: role_name or ROLE_USER})
 
     async def login(
         self, session: AsyncSession, payload: LoginRequest, client_ip: str = ""
@@ -473,23 +400,6 @@ class UserService:
             "nickname": user.nickname,
             "role_code": user.role_code,
             "role_name": role_name or user.role_code,
-            "last_login_at": format_beijing(user.last_login_at),
-            "created_at": format_beijing(user.created_at),
-        }
-
-    @staticmethod
-    def serialize_admin_user(
-        user: User, role_names: dict[str, str] | None = None
-    ) -> dict:
-        """序列化管理员用户列表，不返回密码等敏感字段。"""
-        return {
-            "id": user.id,
-            "username": user.username,
-            "email": user.email,
-            "nickname": user.nickname,
-            "role_code": user.role_code,
-            "role_name": (role_names or {}).get(user.role_code, user.role_code),
-            "is_active": user.is_active,
             "last_login_at": format_beijing(user.last_login_at),
             "created_at": format_beijing(user.created_at),
         }

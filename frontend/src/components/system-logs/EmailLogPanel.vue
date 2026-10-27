@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 import { Filter, Mail, RefreshCw, Search } from 'lucide-vue-next'
-import { emailLogApi, publicApi } from '../api'
-import type { DictionaryOption, EmailLogRecord, Pagination } from '../types'
-import EmptyState from '../components/common/EmptyState.vue'
-import LoadingOverlay from '../components/common/LoadingOverlay.vue'
-import { useToast } from '../composables/useToast'
+import { emailLogApi, publicApi } from '../../api'
+import type { DictionaryOption, EmailLogRecord, Pagination } from '../../types'
+import EmptyState from '../common/EmptyState.vue'
+import LoadingOverlay from '../common/LoadingOverlay.vue'
+import { useToast } from '../../composables/useToast'
 
 const toast = useToast()
 const loading = ref(false)
@@ -92,18 +92,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="page-enter email-log-page">
-    <div class="page-heading">
-      <div>
-        <p class="eyebrow">EMAIL LOGS</p>
-        <h1>邮件日志</h1>
-        <p>查看全部用户的邮件发送记录，包含发送成功、失败、被限流或配置缺失被拒绝的明细。</p>
-      </div>
-      <button type="button" class="button secondary" title="刷新邮件日志" :disabled="loading" @click="loadLogs">
-        <RefreshCw :size="17" :class="{ spin: loading }" />刷新
-      </button>
-    </div>
-
+  <div class="email-log-panel">
     <section class="filter-panel">
       <div class="filter-title"><Filter :size="17" /><strong>筛选条件</strong></div>
       <div class="filter-fields">

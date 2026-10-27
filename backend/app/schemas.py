@@ -84,6 +84,29 @@ class AdminUserCreateRequest(BaseModel):
         return validate_password_strength_value(value)
 
 
+class AdminUserUpdateRequest(BaseModel):
+    """管理员修改用户资料的参数，所有字段均可选，只更新提交的字段。"""
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    nickname: str | None = Field(default=None, min_length=1, max_length=50)
+    email: EmailStr | None = None
+    role_code: Literal["admin", "user"] | None = None
+    is_active: bool | None = None
+
+
+class AdminPasswordResetRequest(BaseModel):
+    """管理员重置指定用户登录密码的参数。"""
+
+    new_password: str = Field(min_length=8, max_length=128)
+
+    @field_validator("new_password")
+    @classmethod
+    def validate_new_password_strength(cls, value: str) -> str:
+        """重置密码必须同时包含字母和数字。"""
+        return validate_password_strength_value(value)
+
+
 class GeetestValidateRequest(BaseModel):
     """极验 GT3 二次校验参数。"""
 

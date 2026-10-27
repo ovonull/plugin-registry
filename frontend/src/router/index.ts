@@ -9,6 +9,9 @@ export const appRoutes: RouteRecordRaw[] = [
   { path: '/plugin-review', name: 'plugin-review', component: () => import('../pages/PluginReviewPage.vue'), meta: { title: '插件审核', menu: true, icon: 'shield-check', admin: true } },
   { path: '/profile', name: 'profile', component: () => import('../pages/ProfilePage.vue'), meta: { title: '个人设置', menu: true, icon: 'user' } },
   { path: '/settings', name: 'settings', component: () => import('../pages/SystemSettingsPage.vue'), meta: { title: '系统设置', menu: true, icon: 'settings', admin: true } },
+  // 管理员专属：用户管理与系统日志，普通用户既看不到菜单也无法直达路由。
+  { path: '/users', name: 'users', component: () => import('../pages/UserManagementPage.vue'), meta: { title: '用户管理', menu: true, icon: 'users', admin: true } },
+  { path: '/system-logs', name: 'system-logs', component: () => import('../pages/SystemLogsPage.vue'), meta: { title: '系统日志', menu: true, icon: 'scroll-text', admin: true } },
 ]
 
 const router = createRouter({
