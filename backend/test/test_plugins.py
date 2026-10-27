@@ -114,6 +114,16 @@ def test_normalize_manifest_keeps_unknown_field() -> None:
     assert normalized["http_endpoints"] == [{"path": "/hook"}]
 
 
+def test_normalize_manifest_keeps_unknown_config_type() -> None:
+    """放开配置项 type 白名单后，未知类型不再拒收，而是原样保留。"""
+    payload = dict(
+        VALID_MANIFEST,
+        config_schema=[{"key": "target_groups", "label": "群", "type": "group_multi_select"}],
+    )
+    normalized = normalize_manifest(payload)
+    assert normalized["config_schema"][0]["type"] == "group_multi_select"
+
+
 def test_normalize_manifest_rejects_bad_version_and_plugin_id() -> None:
     """版本号必须三段式，插件标识必须含点或连字符。"""
     with pytest.raises(BusinessError) as version_error:

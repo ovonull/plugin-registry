@@ -99,10 +99,6 @@ WEB_URL_PATTERN = re.compile(r"^https?://[^\s]+$")
 ALLOWED_ICON_EXTENSIONS: frozenset[str] = frozenset(
     {".png", ".jpg", ".jpeg", ".svg", ".webp"}
 )
-ALLOWED_CONFIG_TYPES: frozenset[str] = frozenset(
-    {"text", "password", "number", "switch", "select"}
-)
-
 MAX_DEPENDENCY_COUNT = 30
 MAX_CONFIG_ITEM_COUNT = 50
 MAX_DESCRIPTION_LENGTH = 2000
@@ -360,12 +356,6 @@ def _validate_config_schema(payload: dict[str, Any]) -> list[dict[str, Any]]:
         if not isinstance(label, str) or not label.strip():
             _raise(f"配置项 {key} 缺少必填字段：显示名称", CODE_MANIFEST_INVALID)
         item_type = str(raw.get("type") or "text").strip()
-        if item_type not in ALLOWED_CONFIG_TYPES:
-            _raise(
-                f"配置项 {key} 的类型不支持：{item_type}，可选类型为："
-                + "、".join(sorted(ALLOWED_CONFIG_TYPES)),
-                CODE_MANIFEST_INVALID,
-            )
         options = raw.get("options") or []
         if item_type == "select":
             if not isinstance(options, list) or not options:
