@@ -295,11 +295,15 @@
   min-width: 0;
   height: 100%;
   border: 0;
+  /* 关掉 search 类型默认外观，否则输入框内部会多渲染一圈边框（双重边框） */
+  -webkit-appearance: none;
+  appearance: none;
   background: transparent;
   color: var(--hero-search-text);
   font: inherit;
   font-size: 14px;
   outline: none;
+  box-shadow: none;
 }
 
 .home-search input::placeholder {
